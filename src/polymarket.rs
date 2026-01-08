@@ -165,6 +165,10 @@ struct MarketResponse {
     question: Option<String>,
     #[serde(rename = "outcomes")]
     outcomes: Option<Vec<String>>,
+    #[serde(rename = "description")]
+    description: Option<String>,
+    #[serde(rename = "category")]
+    category: Option<String>,
 }
 
 pub async fn fetch_market_info(market_id: &str) -> Option<(String, String)> {

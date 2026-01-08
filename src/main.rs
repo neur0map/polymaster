@@ -287,6 +287,13 @@ fn print_whale_alert(platform: &str, trade: &polymarket::Trade, value: f64, wall
         println!("Market:   {}", title.bright_white().bold());
         if let Some(ref outcome) = trade.outcome {
             println!("Outcome:  {}", outcome.bright_cyan());
+            // Make it clear what they're betting on
+            let side_clarification = if trade.side.to_uppercase() == "BUY" {
+                format!("Betting:  {} on '{}' outcome", trade.side.to_uppercase(), outcome)
+            } else {
+                format!("Betting:  {} (selling '{}' outcome)", trade.side.to_uppercase(), outcome)
+            };
+            println!("{}", side_clarification.bright_yellow());
         }
     } else {
         println!("Market ID: {}", trade.market);
@@ -346,6 +353,10 @@ fn print_kalshi_alert(trade: &kalshi::Trade, value: f64, _wallet_activity: Optio
         println!("Market:     {}", title.bright_white().bold());
     }
     println!("Ticker:     {}", trade.ticker.bright_cyan());
+    
+    // Parse and display what the bet means
+    let bet_details = kalshi::parse_ticker_details(&trade.ticker);
+    println!("Bet:        {}", bet_details.bright_yellow());
     
     println!(
         "Value:      {}",

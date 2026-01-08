@@ -114,3 +114,70 @@ pub async fn fetch_market_info(ticker: &str) -> Option<String> {
     
     None
 }
+
+pub fn parse_ticker_details(ticker: &str) -> String {
+    // Parse Kalshi ticker to extract bet details
+    // Format examples:
+    // KXNHLGAME-26JAN08ANACAR-CAR = NHL game, Carolina wins
+    // KXHIGHNY-24DEC-T63 = NYC high temp threshold
+    
+    if ticker.contains("NHLGAME") || ticker.contains("NFLGAME") || 
+       ticker.contains("NBAGAME") || ticker.contains("MLBGAME") {
+        // Sports game format
+        let parts: Vec<&str> = ticker.split('-').collect();
+        if parts.len() >= 3 {
+            let outcome = parts.last().unwrap_or(&"");
+            
+            // Extract team codes from middle part
+            if let Some(teams_part) = parts.get(parts.len() - 2) {
+                // Format like "26JAN08ANACAR" - extract last 6 chars for teams
+                if teams_part.len() >= 6 {
+                    let team_codes = &teams_part[teams_part.len()-6..];
+                    let away = &team_codes[..3];
+                    let home = &team_codes[3..];
+                    
+                    let sport = if ticker.contains("NHL") { "NHL" }
+                              else if ticker.contains("NFL") { "NFL" }
+                              else if ticker.contains("NBA") { "NBA" }
+                              else { "MLB" };
+                    
+                    return format!("Betting YES = {} wins | {} @ {} ({})", 
+                        outcome.to_uppercase(), away.to_uppercase(), home.to_uppercase(), sport);
+                }
+            }
+        }
+    } else if ticker.contains("HIGH") || ticker.contains("LOW") {
+        // Temperature markets
+        if ticker.contains("T") {
+            let parts: Vec<&str> = ticker.split('-').collect();
+            if let Some(threshold_part) = parts.last() {
+                if threshold_part.starts_with('T') {
+                    let temp = &threshold_part[1..];
+                    let location = if ticker.contains("NY") { "NYC" }
+                                  else if ticker.contains("LA") { "LA" }
+                                  else if ticker.contains("CHI") { "Chicago" }
+                                  else { "Location" };
+                    
+                    let metric = if ticker.contains("HIGH") { "High" } else { "Low" };
+                    return format!("Betting YES = {} temp ≥ {}°F", metric, temp);
+                }
+            }
+        }
+    } else if ticker.contains("PRES") {
+        // Presidential/election markets
+        let parts: Vec<&str> = ticker.split('-').collect();
+        if let Some(outcome) = parts.last() {
+            return format!("Betting YES = {} wins", outcome.to_uppercase());
+        }
+    }
+    
+    // Default: try to extract outcome from last part
+    let parts: Vec<&str> = ticker.split('-').collect();
+    if let Some(outcome) = parts.last() {
+        if outcome.len() <= 10 && outcome.chars().all(|c| c.is_alphanumeric()) {
+            return format!("Betting YES = {} outcome", outcome.to_uppercase());
+        }
+    }
+    
+    String::from("Yes/No market - check ticker for details")
+}
