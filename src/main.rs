@@ -314,29 +314,31 @@ fn print_whale_alert(platform: &str, trade: &polymarket::Trade, value: f64, wall
     
     // Display market title if available
     if let Some(ref title) = trade.market_title {
-        println!("Market:   {}", title.bright_white().bold());
+        println!("Question:   {}", title.bright_white().bold());
+        
         if let Some(ref outcome) = trade.outcome {
-            println!("Outcome:  {}", outcome.bright_cyan());
-            // Make it clear what they're betting on
-            let side_clarification = if trade.side.to_uppercase() == "BUY" {
-                format!("Betting:  {} on '{}' outcome", trade.side.to_uppercase(), outcome)
+            let action = if trade.side.to_uppercase() == "BUY" {
+                format!("BUYING '{}' shares", outcome)
             } else {
-                format!("Betting:  {} (selling '{}' outcome)", trade.side.to_uppercase(), outcome)
+                format!("SELLING '{}' shares", outcome)
             };
-            println!("{}", side_clarification.bright_yellow());
+            println!("Position:   {}", action.bright_yellow().bold());
+            println!("Prediction: Market believes '{}' has {:.1}% chance", 
+                outcome, trade.price * 100.0);
         }
     } else {
-        println!("Market ID: {}", trade.market);
+        println!("Market:     Unknown (ID: {})", &trade.market[..20.min(trade.market.len())]);
     }
     
+    println!();
+    println!("{}", "TRANSACTION DETAILS".dimmed());
     println!(
-        "Value:    {}",
+        "Amount:     {}",
         format!("${:.2}", value).bright_yellow().bold()
     );
-    println!("Price:    ${:.4} ({:.1}%)", trade.price, trade.price * 100.0);
-    println!("Size:     {:.2} contracts", trade.size);
-    println!("Side:     {}", trade.side.to_uppercase().bright_magenta());
-    println!("Time:     {}", trade.timestamp);
+    println!("Contracts:  {:.2} @ ${:.4} each", trade.size, trade.price);
+    println!("Action:     {} shares", trade.side.to_uppercase().bright_magenta());
+    println!("Timestamp:  {}", trade.timestamp);
     
     // Display wallet activity if available
     if let Some(activity) = wallet_activity {
@@ -380,23 +382,25 @@ fn print_kalshi_alert(trade: &kalshi::Trade, value: f64, _wallet_activity: Optio
     
     // Display market title if available
     if let Some(ref title) = trade.market_title {
-        println!("Market:     {}", title.bright_white().bold());
+        println!("Question:   {}", title.bright_white().bold());
     }
-    println!("Ticker:     {}", trade.ticker.bright_cyan());
     
     // Parse and display what the bet means
     let bet_details = kalshi::parse_ticker_details(&trade.ticker);
-    println!("Bet:        {}", bet_details.bright_yellow());
+    println!("Position:   {}", bet_details.bright_yellow().bold());
+    println!("Direction:  {} (buying {} outcome)", trade.taker_side.to_uppercase().bright_magenta(), trade.taker_side.to_uppercase());
     
+    println!();
+    println!("{}", "TRANSACTION DETAILS".dimmed());
     println!(
-        "Value:      {}",
+        "Amount:     {}",
         format!("${:.2}", value).bright_yellow().bold()
     );
-    println!("Yes Price:  ${:.2} ({:.1}%)", trade.yes_price, trade.yes_price);
-    println!("No Price:   ${:.2} ({:.1}%)", trade.no_price, trade.no_price);
-    println!("Count:      {} contracts", trade.count);
-    println!("Taker Side: {}", trade.taker_side.to_uppercase().bright_magenta());
-    println!("Time:       {}", trade.created_time);
+    println!("Contracts:  {} @ ${:.2} avg", trade.count, value / trade.count as f64);
+    println!("Odds:       YES: {:.1}% | NO: {:.1}%", trade.yes_price, trade.no_price);
+    println!("Timestamp:  {}", trade.created_time);
+    println!();
+    println!("{}", format!("Ticker: {}", trade.ticker).dimmed());
     
     // Anomaly detection
     let avg_price = (trade.yes_price + trade.no_price) / 2.0;

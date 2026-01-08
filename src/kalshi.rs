@@ -121,6 +121,26 @@ pub fn parse_ticker_details(ticker: &str) -> String {
     // KXNHLGAME-26JAN08ANACAR-CAR = NHL game, Carolina wins
     // KXNCAAFTOTAL-26JAN08MIAMISS-51 = NCAA football total points over 51
     // KXHIGHNY-24DEC-T63 = NYC high temp threshold
+    // KXETHD-26JAN0818-T3109.99 = ETH price threshold
+    
+    // Cryptocurrency/Stock price thresholds
+    if ticker.contains("ETH") || ticker.contains("BTC") || ticker.contains("SOL") || 
+       ticker.contains("SPX") || ticker.contains("TSLA") {
+        let parts: Vec<&str> = ticker.split('-').collect();
+        if let Some(threshold_part) = parts.last() {
+            if threshold_part.starts_with('T') || threshold_part.starts_with('t') {
+                let price = &threshold_part[1..];
+                let asset = if ticker.contains("ETH") { "Ethereum (ETH)" }
+                          else if ticker.contains("BTC") { "Bitcoin (BTC)" }
+                          else if ticker.contains("SOL") { "Solana (SOL)" }
+                          else if ticker.contains("SPX") { "S&P 500" }
+                          else if ticker.contains("TSLA") { "Tesla" }
+                          else { "Asset" };
+                
+                return format!("Betting YES = {} price ≥ ${} at expiry", asset, price);
+            }
+        }
+    }
     
     // Check for sports totals (over/under)
     if ticker.contains("TOTAL") {
