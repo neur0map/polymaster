@@ -41,9 +41,9 @@ struct TradesResponse {
 
 #[derive(Debug, Deserialize)]
 struct ActivityItem {
-    #[serde(rename = "id")]
+    #[serde(rename = "transactionHash")]
     id: String,
-    #[serde(rename = "market")]
+    #[serde(rename = "conditionId")]
     market: Option<String>,
     #[serde(rename = "asset")]
     asset: Option<String>,
@@ -55,14 +55,17 @@ struct ActivityItem {
     price: Option<f64>,
     #[serde(rename = "timestamp")]
     timestamp: Option<i64>,
-    #[serde(rename = "type")]
-    activity_type: Option<String>,
-    #[serde(rename = "user")]
+    #[serde(rename = "name")]
     user: Option<String>,
     #[serde(rename = "maker")]
     maker: Option<String>,
     #[serde(rename = "proxyWallet")]
     proxy_wallet: Option<String>,
+    // New API includes these fields directly
+    #[serde(rename = "title")]
+    title: Option<String>,
+    #[serde(rename = "outcome")]
+    outcome: Option<String>,
 }
 
 pub async fn fetch_recent_trades() -> Result<Vec<Trade>, PolymarketError> {
@@ -93,11 +96,6 @@ pub async fn fetch_recent_trades() -> Result<Vec<Trade>, PolymarketError> {
         let trades = items
             .into_iter()
             .filter_map(|item| {
-                // Only process TRADE type activities with all required fields
-                if item.activity_type.as_deref() != Some("TRADE") {
-                    return None;
-                }
-
                 // Skip trades missing critical data
                 let market = item.market?;
                 let asset_id = item.asset?;
@@ -119,9 +117,10 @@ pub async fn fetch_recent_trades() -> Result<Vec<Trade>, PolymarketError> {
                                 .map(|dt| dt.to_rfc3339())
                         })
                         .unwrap_or_else(|| format!("timestamp_error_{}", item.id)),
-                    market_title: None,
-                    outcome: None,
-                    wallet_id: item.user.or(item.maker).or(item.proxy_wallet),
+                    // New API includes title and outcome directly
+                    market_title: item.title,
+                    outcome: item.outcome,
+                    wallet_id: item.proxy_wallet.or(item.user).or(item.maker),
                 })
             })
             .collect();
@@ -134,10 +133,6 @@ pub async fn fetch_recent_trades() -> Result<Vec<Trade>, PolymarketError> {
             .data
             .into_iter()
             .filter_map(|item| {
-                if item.activity_type.as_deref() != Some("TRADE") {
-                    return None;
-                }
-
                 // Skip trades missing critical data
                 let market = item.market?;
                 let asset_id = item.asset?;
@@ -159,9 +154,10 @@ pub async fn fetch_recent_trades() -> Result<Vec<Trade>, PolymarketError> {
                                 .map(|dt| dt.to_rfc3339())
                         })
                         .unwrap_or_else(|| format!("timestamp_error_{}", item.id)),
-                    market_title: None,
-                    outcome: None,
-                    wallet_id: item.user.or(item.maker).or(item.proxy_wallet),
+                    // New API includes title and outcome directly
+                    market_title: item.title,
+                    outcome: item.outcome,
+                    wallet_id: item.proxy_wallet.or(item.user).or(item.maker),
                 })
             })
             .collect();
@@ -171,37 +167,4 @@ pub async fn fetch_recent_trades() -> Result<Vec<Trade>, PolymarketError> {
     // If parsing fails, return empty list rather than error
     // This allows the tool to continue working even if Polymarket API format changes
     Ok(Vec::new())
-}
-
-#[derive(Debug, Deserialize)]
-struct MarketResponse {
-    #[serde(rename = "title")]
-    title: Option<String>,
-    #[serde(rename = "question")]
-    question: Option<String>,
-    #[serde(rename = "outcomes")]
-    outcomes: Option<Vec<String>>,
-}
-
-pub async fn fetch_market_info(market_id: &str) -> Option<(String, String)> {
-    let client = reqwest::Client::new();
-
-    // Try Gamma Markets API
-    let url = format!("https://gamma-api.polymarket.com/markets/{}", market_id);
-
-    match client.get(&url).send().await {
-        Ok(response) if response.status().is_success() => {
-            if let Ok(text) = response.text().await {
-                if let Ok(market) = serde_json::from_str::<MarketResponse>(&text) {
-                    // Only return data if we have both title and outcome from API
-                    let title = market.question.or(market.title)?;
-                    let outcome = market.outcomes.and_then(|o| o.first().cloned())?;
-                    return Some((title, outcome));
-                }
-            }
-        }
-        _ => {}
-    }
-
-    None
 }

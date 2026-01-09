@@ -337,13 +337,8 @@ async fn watch_whales(threshold: u64, interval: u64) -> Result<(), Box<dyn std::
 
                         let trade_value = trade.size * trade.price;
                         if trade_value >= threshold as f64 {
-                            // Fetch market details
-                            if let Some((title, outcome)) =
-                                polymarket::fetch_market_info(&trade.market).await
-                            {
-                                trade.market_title = Some(title);
-                                trade.outcome = Some(outcome);
-                            }
+                            // Market details are now included in the API response
+                            // No need for extra fetch
 
                             // Track wallet activity
                             let wallet_activity = if let Some(ref wallet_id) = trade.wallet_id {
