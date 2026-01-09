@@ -688,12 +688,12 @@ fn play_anomaly_sound() {
     play_sound_internal("/System/Library/Sounds/Funk.aiff");
 }
 
-fn play_sound_internal(sound_file: &str) {
+fn play_sound_internal(_sound_file: &str) {
     // macOS: Use afplay with system sound
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("afplay")
-            .arg(sound_file)
+            .arg(_sound_file)
             .spawn()
             .ok();
     }
