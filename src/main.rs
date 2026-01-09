@@ -825,6 +825,7 @@ struct WebhookAlert<'a> {
 }
 
 // Escape special characters that might cause issues with HTML/Markdown parsers
+// These characters have special meaning in Telegram/Discord/Slack markdown
 fn escape_special_chars(s: &str) -> String {
     s.replace('&', "and")
         .replace('<', "less than")
@@ -835,6 +836,18 @@ fn escape_special_chars(s: &str) -> String {
         .replace('|', "-")
         .replace('[', "(")
         .replace(']', ")")
+        .replace('_', " ")
+        .replace('*', "")
+        .replace('`', "'")
+        .replace('~', "")
+        .replace('#', "")
+        .replace('+', "plus")
+        .replace('-', " ")
+        .replace('=', " equals ")
+        .replace('{', "(")
+        .replace('}', ")")
+        .replace('!', "")
+        .replace('.', " ")
 }
 
 async fn send_webhook_alert(webhook_url: &str, alert: WebhookAlert<'_>) {
