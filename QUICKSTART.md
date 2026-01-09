@@ -1,53 +1,38 @@
 # Quick Start Guide
 
+## ⚠️ DISCLAIMER
+
+**This tool is for informational and research purposes only.** I do not condone gambling or speculative trading. Use this data solely for informed decision-making and market analysis. Trade responsibly and within your means.
+
+---
+
 Get started with Whale Watcher in under 2 minutes.
 
-## Step 1: Build the Tool
+## Installation & Usage
 
 ```bash
-cd polymaster
-cargo build --release
+# Build and install
+cargo install --path .
+
+# Start monitoring (no setup required)
+wwatcher watch
+
+# Customize threshold or interval
+wwatcher watch -t 50000 -i 10
 ```
 
-The binary will be at `target/release/wwatcher`
+### What it does:
+- Monitors Polymarket & Kalshi for transactions over $25k (default)
+- Alerts with audio notification when whales are detected
+- Tracks wallet activity and repeat actors
+- Identifies unusual trading patterns automatically
+- No API keys required (uses public endpoints)
 
-## Step 2: Run Without Setup (Optional Configuration)
-
-You can start watching immediately without any setup:
+### Optional: Authenticated Access
 
 ```bash
-./target/release/wwatcher watch
+wwatcher setup  # Configure Kalshi credentials for higher rate limits
 ```
-
-This will:
-- Watch for transactions over $25,000
-- Check every 5 seconds
-- Use public API endpoints (no auth needed)
-- Show market titles and bet details
-- Detect anomalies in trading patterns
-
-## Step 3: Customize Your Watch
-
-```bash
-# Watch for $50k+ trades
-./target/release/wwatcher watch -t 50000
-
-# Check every 30 seconds instead
-./target/release/wwatcher watch -i 30
-
-# Both together - $100k threshold, check every minute
-./target/release/wwatcher watch -t 100000 -i 60
-```
-
-## Step 4: Optional - Add Kalshi Authentication
-
-If you want authenticated Kalshi access:
-
-```bash
-./target/release/wwatcher setup
-```
-
-Follow the prompts to add your Kalshi API credentials.
 
 ## API Key Information
 

@@ -4,6 +4,12 @@ A Rust CLI tool that monitors large transactions on Polymarket and Kalshi predic
 
 **Repository**: https://github.com/neur0map/polymaster
 
+## ⚠️ DISCLAIMER
+
+**This tool is for informational and research purposes only.**
+
+I do not condone gambling or speculative trading. Use this data solely for informed decision-making and market analysis. Trade responsibly and within your means.
+
 ## Features
 
 - **Real-time monitoring** of Polymarket and Kalshi transactions
@@ -43,44 +49,26 @@ The binary will be available at `target/release/wwatcher` or in your cargo bin d
 
 ## Quick Start
 
-### 1. Setup (Optional)
-
-Configure API credentials if you want authenticated access to Kalshi (optional):
-
 ```bash
-wwatcher setup
-```
+# 1. Install
+cargo install --path .
 
-This will guide you through:
-- **Kalshi API credentials** (optional) - Generate at https://kalshi.com/profile/api-keys
-- **Polymarket** - No API key needed! Public access only
-
-Your configuration is saved to `~/.config/wwatcher/config.json` (macOS/Linux) or equivalent on Windows.
-
-### 2. Watch for Whales
-
-Start monitoring with default settings ($25,000 threshold, 5 second polling):
-
-```bash
+# 2. Start monitoring (no setup required)
 wwatcher watch
+
+# 3. Optional: Customize threshold or interval
+wwatcher watch --threshold 50000 --interval 10
 ```
 
-Or customize:
+That's it! The tool monitors Polymarket and Kalshi for transactions over $25k.
+
+### Optional Setup
+
+For authenticated Kalshi access (not required):
 
 ```bash
-# Watch for $50k+ trades, check every 30 seconds
-wwatcher watch --threshold 50000 --interval 30
-
-# Watch for $10k+ trades, check every 10 seconds  
-wwatcher watch -t 10000 -i 10
-```
-
-### 3. Check Status
-
-View your current configuration:
-
-```bash
-wwatcher status
+wwatcher setup  # Configure optional API credentials
+wwatcher status # View current configuration
 ```
 
 ## API Information
@@ -213,6 +201,3 @@ If you're getting rate limited:
 
 This tool is for educational and monitoring purposes. Please review the terms of service for Polymarket and Kalshi APIs.
 
-## Disclaimer
-
-This is a monitoring tool, not a trading bot. It does not execute any trades. Always verify transaction data and do your own research before making investment decisions.

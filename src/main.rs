@@ -170,14 +170,19 @@ async fn show_status() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn watch_whales(threshold: u64, interval: u64) -> Result<(), Box<dyn std::error::Error>> {
+    // Display disclaimer
+    println!("{}", "=".repeat(70).bright_yellow());
+    println!("{}", "DISCLAIMER".bright_yellow().bold());
+    println!("This tool is for informational and research purposes only.");
+    println!("I do not condone gambling or speculative trading.");
+    println!("Use this data solely for informed decision-making and market analysis.");
+    println!("Trade responsibly and within your means.");
+    println!("{}", "=".repeat(70).bright_yellow());
+    println!();
+    
     println!("{}", "WHALE WATCHER ACTIVE".bright_cyan().bold());
-    println!(
-        "Monitoring transactions exceeding: {}",
-        format!("${}", format_number(threshold)).bright_green()
-    );
-    println!("Polling interval: {} seconds", interval);
-    println!("Anomaly detection: ENABLED");
-    println!("Wallet tracking: ENABLED");
+    println!("Threshold: {}", format!("${}", format_number(threshold)).bright_green());
+    println!("Interval:  {} seconds", interval);
     println!();
 
     // Load config (optional credentials)
