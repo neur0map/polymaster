@@ -35,6 +35,8 @@ enum Commands {
     Status,
     /// Test alert sound
     TestSound,
+    /// Test webhook notification
+    TestWebhook,
 }
 
 #[tokio::main]
@@ -56,6 +58,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::TestSound => {
             test_sound().await?;
+        }
+        Commands::TestWebhook => {
+            test_webhook().await?;
         }
     }
 
@@ -165,6 +170,76 @@ async fn test_sound() -> Result<(), Box<dyn std::error::Error>> {
     println!("  1. System volume is not muted");
     println!("  2. Sound file exists: /System/Library/Sounds/Ping.aiff");
     println!("  3. Try: afplay /System/Library/Sounds/Ping.aiff");
+
+    Ok(())
+}
+
+async fn test_webhook() -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}", "TESTING WEBHOOK".bright_cyan().bold());
+    println!();
+
+    let config = match config::load_config() {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            println!(
+                "{}",
+                "No configuration found. Run 'wwatcher setup' first.".red()
+            );
+            return Ok(());
+        }
+    };
+
+    let webhook_url = match config.webhook_url {
+        Some(url) => url,
+        None => {
+            println!(
+                "{}",
+                "No webhook configured. Run 'wwatcher setup' to add a webhook URL.".red()
+            );
+            return Ok(());
+        }
+    };
+
+    println!("Sending test alert to: {}", webhook_url.bright_green());
+    println!();
+
+    // Create a test alert
+    let test_activity = types::WalletActivity {
+        transactions_last_hour: 2,
+        transactions_last_day: 5,
+        total_value_hour: 125000.0,
+        total_value_day: 380000.0,
+        is_repeat_actor: true,
+        is_heavy_actor: true,
+    };
+
+    send_webhook_alert(
+        &webhook_url,
+        WebhookAlert {
+            platform: "Polymarket",
+            market_title: Some("Will Bitcoin reach $100k by end of 2026?"),
+            outcome: Some("Yes"),
+            side: "BUY",
+            value: 50000.0,
+            price: 0.65,
+            size: 76923.08,
+            timestamp: &chrono::Utc::now().to_rfc3339(),
+            wallet_id: Some("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"),
+            wallet_activity: Some(&test_activity),
+        },
+    )
+    .await;
+
+    println!();
+    println!("{}", "Test webhook sent!".bright_green());
+    println!("Check your n8n workflow to see if it received the data.");
+    println!();
+    println!("The webhook should receive a JSON payload with:");
+    println!("  - platform: Polymarket");
+    println!("  - alert_type: WHALE_ENTRY");
+    println!("  - action: BUY");
+    println!("  - value: $50,000");
+    println!("  - Wallet activity with repeat actor flag");
 
     Ok(())
 }
