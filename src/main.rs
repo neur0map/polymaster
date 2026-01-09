@@ -73,24 +73,44 @@ async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
     // Get Kalshi credentials (optional)
     println!("{}", "Kalshi Configuration (optional):".bright_yellow());
     println!("Generate API keys at: https://kalshi.com/profile/api-keys");
+    println!("Press Enter to skip if you don't have credentials.");
+    println!();
 
     print!("Enter Kalshi API Key ID (or press Enter to skip): ");
+    io::stdout().flush()?;
     let mut kalshi_key_id = String::new();
     std::io::stdin().read_line(&mut kalshi_key_id)?;
     let kalshi_key_id = kalshi_key_id.trim().to_string();
 
     let kalshi_private_key = if !kalshi_key_id.is_empty() {
         print!("Enter Kalshi Private Key: ");
+        io::stdout().flush()?;
         let mut key = String::new();
         std::io::stdin().read_line(&mut key)?;
         key.trim().to_string()
     } else {
+        println!("Skipping Kalshi API configuration.");
         String::new()
     };
 
     println!();
-    println!("{}", "Polymarket Configuration:".bright_yellow());
-    println!("Polymarket data is publicly accessible - no API key needed!");
+    println!("{}", "Webhook Configuration (optional):".bright_yellow());
+    println!("Send alerts to a webhook URL (works with n8n, Zapier, Make, etc.)");
+    println!("Example: https://your-n8n-instance.com/webhook/whale-alerts");
+    println!();
+
+    print!("Enter Webhook URL (or press Enter to skip): ");
+    io::stdout().flush()?;
+    let mut webhook_url = String::new();
+    std::io::stdin().read_line(&mut webhook_url)?;
+    let webhook_url = webhook_url.trim().to_string();
+
+    if webhook_url.is_empty() {
+        println!("Skipping webhook configuration.");
+    } else {
+        println!("Webhook configured: {}", webhook_url.bright_green());
+    }
+
     println!();
 
     // Save configuration
@@ -104,6 +124,11 @@ async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
             None
         } else {
             Some(kalshi_private_key)
+        },
+        webhook_url: if webhook_url.is_empty() {
+            None
+        } else {
+            Some(webhook_url)
         },
     };
 
@@ -163,6 +188,14 @@ async fn show_status() -> Result<(), Box<dyn std::error::Error>> {
                 "  Polymarket API: {}",
                 "Public access (no key needed)".green()
             );
+            println!(
+                "  Webhook: {}",
+                if cfg.webhook_url.is_some() {
+                    format!("Configured ({})", cfg.webhook_url.as_ref().unwrap()).green()
+                } else {
+                    "Not configured".yellow()
+                }
+            );
         }
         Err(_) => {
             println!("No configuration found. Run 'wwatcher setup' to configure.");
@@ -189,10 +222,17 @@ async fn watch_whales(threshold: u64, interval: u64) -> Result<(), Box<dyn std::
         format!("${}", format_number(threshold)).bright_green()
     );
     println!("Interval:  {} seconds", interval);
-    println!();
 
     // Load config (optional credentials)
     let config = config::load_config().ok();
+
+    if let Some(ref cfg) = config {
+        if cfg.webhook_url.is_some() {
+            println!("Webhook:   {}", "Enabled".bright_green());
+        }
+    }
+
+    println!();
 
     let mut last_polymarket_trade_id: Option<String> = None;
     let mut last_kalshi_trade_id: Option<String> = None;
@@ -244,6 +284,28 @@ async fn watch_whales(threshold: u64, interval: u64) -> Result<(), Box<dyn std::
                                 trade_value,
                                 wallet_activity.as_ref(),
                             );
+
+                            // Send webhook notification
+                            if let Some(ref cfg) = config {
+                                if let Some(ref webhook_url) = cfg.webhook_url {
+                                    send_webhook_alert(
+                                        webhook_url,
+                                        WebhookAlert {
+                                            platform: "Polymarket",
+                                            market_title: trade.market_title.as_deref(),
+                                            outcome: trade.outcome.as_deref(),
+                                            side: &trade.side,
+                                            value: trade_value,
+                                            price: trade.price,
+                                            size: trade.size,
+                                            timestamp: &trade.timestamp,
+                                            wallet_id: trade.wallet_id.as_deref(),
+                                            wallet_activity: wallet_activity.as_ref(),
+                                        },
+                                    )
+                                    .await;
+                                }
+                            }
                         }
                     }
 
@@ -279,6 +341,28 @@ async fn watch_whales(threshold: u64, interval: u64) -> Result<(), Box<dyn std::
                             }
                             // Note: Kalshi doesn't expose wallet IDs in public API
                             print_kalshi_alert(trade, trade_value, None);
+
+                            // Send webhook notification
+                            if let Some(ref cfg) = config {
+                                if let Some(ref webhook_url) = cfg.webhook_url {
+                                    send_webhook_alert(
+                                        webhook_url,
+                                        WebhookAlert {
+                                            platform: "Kalshi",
+                                            market_title: trade.market_title.as_deref(),
+                                            outcome: None,
+                                            side: &trade.taker_side,
+                                            value: trade_value,
+                                            price: trade.yes_price / 100.0,
+                                            size: f64::from(trade.count),
+                                            timestamp: &trade.created_time,
+                                            wallet_id: None,
+                                            wallet_activity: None,
+                                        },
+                                    )
+                                    .await;
+                                }
+                            }
                         }
                     }
 
@@ -644,6 +728,77 @@ fn detect_anomalies(
         println!("{}", "[ANOMALY INDICATORS]".bright_red().bold());
         for anomaly in anomalies {
             println!("  - {}", anomaly.yellow());
+        }
+    }
+}
+
+struct WebhookAlert<'a> {
+    platform: &'a str,
+    market_title: Option<&'a str>,
+    outcome: Option<&'a str>,
+    side: &'a str,
+    value: f64,
+    price: f64,
+    size: f64,
+    timestamp: &'a str,
+    wallet_id: Option<&'a str>,
+    wallet_activity: Option<&'a types::WalletActivity>,
+}
+
+async fn send_webhook_alert(webhook_url: &str, alert: WebhookAlert<'_>) {
+    use serde_json::json;
+
+    let is_sell = alert.side.to_uppercase() == "SELL";
+    let alert_type = if is_sell { "WHALE_EXIT" } else { "WHALE_ENTRY" };
+
+    let mut payload = json!({
+        "platform": alert.platform,
+        "alert_type": alert_type,
+        "action": alert.side.to_uppercase(),
+        "value": alert.value,
+        "price": alert.price,
+        "size": alert.size,
+        "timestamp": alert.timestamp,
+        "market_title": alert.market_title,
+        "outcome": alert.outcome,
+    });
+
+    // Add wallet information if available
+    if let Some(wallet) = alert.wallet_id {
+        payload["wallet_id"] = json!(wallet);
+    }
+
+    if let Some(activity) = alert.wallet_activity {
+        payload["wallet_activity"] = json!({
+            "transactions_last_hour": activity.transactions_last_hour,
+            "transactions_last_day": activity.transactions_last_day,
+            "total_value_hour": activity.total_value_hour,
+            "total_value_day": activity.total_value_day,
+            "is_repeat_actor": activity.is_repeat_actor,
+            "is_heavy_actor": activity.is_heavy_actor,
+        });
+    }
+
+    // Send POST request to webhook
+    let client = reqwest::Client::new();
+    match client
+        .post(webhook_url)
+        .json(&payload)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(response) => {
+            if !response.status().is_success() {
+                eprintln!(
+                    "{} Webhook failed with status: {}",
+                    "[WEBHOOK ERROR]".red(),
+                    response.status()
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("{} Failed to send webhook: {}", "[WEBHOOK ERROR]".red(), e);
         }
     }
 }

@@ -25,6 +25,8 @@ I do not condone gambling or speculative trading. Use this data solely for infor
   - Exceptionally large position sizes (>100k contracts)
   - Major capital deployment (>$100k)
   - Possible information asymmetry indicators
+- **Webhook notifications** - send alerts to n8n, Zapier, Make, or any webhook endpoint
+- **Exit detection** - special alerts when whales are selling/exiting positions
 - **Persistent configuration** - set up once, no need for exports
 - **Professional CLI output** with clear formatting
 - **No API keys required** for basic functionality (public data access)
@@ -64,11 +66,42 @@ That's it! The tool monitors Polymarket and Kalshi for transactions over $25k.
 
 ### Optional Setup
 
-For authenticated Kalshi access (not required):
+For authenticated Kalshi access or webhook notifications:
 
 ```bash
-wwatcher setup  # Configure optional API credentials
+wwatcher setup  # Configure optional API credentials and webhook
 wwatcher status # View current configuration
+```
+
+**Webhook Integration:**
+During setup, you can configure a webhook URL to receive alerts. This works with:
+- **n8n** - Self-hosted automation platform
+- **Zapier** - Cloud automation service
+- **Make** (formerly Integromat) - Automation platform
+- Any service that accepts HTTP POST requests with JSON payloads
+
+Webhook payload example:
+```json
+{
+  "platform": "Polymarket",
+  "alert_type": "WHALE_ENTRY" or "WHALE_EXIT",
+  "action": "BUY" or "SELL",
+  "value": 50000.0,
+  "price": 0.75,
+  "size": 66666.67,
+  "timestamp": "2026-01-09T06:00:00Z",
+  "market_title": "Will X happen?",
+  "outcome": "Yes",
+  "wallet_id": "0x1234...",
+  "wallet_activity": {
+    "transactions_last_hour": 3,
+    "transactions_last_day": 5,
+    "total_value_hour": 150000.0,
+    "total_value_day": 250000.0,
+    "is_repeat_actor": true,
+    "is_heavy_actor": true
+  }
+}
 ```
 
 ## API Information
@@ -161,7 +194,8 @@ Example `config.json`:
 ```json
 {
   "kalshi_api_key_id": "your-key-id",
-  "kalshi_private_key": "your-private-key"
+  "kalshi_private_key": "your-private-key",
+  "webhook_url": "https://your-n8n-instance.com/webhook/whale-alerts"
 }
 ```
 

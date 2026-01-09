@@ -6,6 +6,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub kalshi_api_key_id: Option<String>,
     pub kalshi_private_key: Option<String>,
+    pub webhook_url: Option<String>,
 }
 
 fn config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
