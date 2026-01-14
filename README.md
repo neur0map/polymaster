@@ -129,6 +129,10 @@ Authentication is optional. Public endpoints are available without an API key. F
 
 Documentation: https://docs.kalshi.com
 
+## ⚠️ DISCLAIMER
+ Currently, there is no code in place to view your order or place orders.
+ current setup only allows for tracking transactions but I do plan to improve the application down the road with n8n.
+
 ## Alert Example
 
 When a whale transaction is detected, you'll see:
