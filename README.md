@@ -198,7 +198,7 @@ Configuration is stored at:
 - Windows: `%APPDATA%\wwatcher\config.json`
 
 Example config.json:
- - Kalshi credentials are not needed, they are only used to view your orders or place orders but there is no functionality for this at the moment.
+ - Kalshi credentials are not needed; they are only used to view your orders or place orders, but there is no functionality for this at the moment.
 ```json
 {
   "kalshi_api_key_id": "your-key-id",
