@@ -4,7 +4,7 @@ A Rust CLI tool that monitors large transactions on Polymarket and Kalshi predic
 
 Repository: https://github.com/neur0map/polymaster
 
-## ⚠️ DISCLAIMER
+## DISCLAIMER
 This tool is for informational and research purposes only. Use this data solely for informed decision-making and market analysis.
 
 ## Features
@@ -49,59 +49,11 @@ The binary will be available at `target/release/wwatcher` or in your cargo bin d
 ## Quick Start
 
 ```bash
-# 1. Install
 cargo install --path .
-
-# 2. Start monitoring (no setup required)
 wwatcher watch
-
-# 3. Optional: Customize threshold or interval
-wwatcher watch --threshold 50000 --interval 10
 ```
 
-That's it! The tool monitors Polymarket and Kalshi for transactions over $25k.
-
-### Optional Setup
-
-For authenticated Kalshi access or webhook notifications:
-
-```bash
-wwatcher setup  # Configure optional API credentials and webhook
-wwatcher status # View current configuration
-```
-
-### Webhook Integration
-
-During setup, you can configure a webhook URL to receive alerts. This works with:
-
-- n8n (self-hosted automation platform)
-- Zapier (cloud automation service)
-- Make, formerly Integromat (automation platform)
-- Any service that accepts HTTP POST requests with JSON payloads
-
-Webhook payload example:
-```json
-{
-  "platform": "Polymarket",
-  "alert_type": "WHALE_ENTRY" or "WHALE_EXIT",
-  "action": "BUY" or "SELL",
-  "value": 50000.0,
-  "price": 0.75,
-  "size": 66666.67,
-  "timestamp": "2026-01-09T06:00:00Z",
-  "market_title": "Will X happen?",
-  "outcome": "Yes",
-  "wallet_id": "0x1234...",
-  "wallet_activity": {
-    "transactions_last_hour": 3,
-    "transactions_last_day": 5,
-    "total_value_hour": 150000.0,
-    "total_value_day": 250000.0,
-    "is_repeat_actor": true,
-    "is_heavy_actor": true
-  }
-}
-```
+See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions and webhook integration.
 
 ## API Information
 
@@ -129,7 +81,7 @@ Authentication is optional. Public endpoints are available without an API key. F
 
 Documentation: https://docs.kalshi.com
 
-## ⚠️ DISCLAIMER
+## DISCLAIMER
  Currently, there is no code in place to view your order or place orders.
  current setup only allows for tracking transactions but I do plan to improve the application down the road with n8n.
 
@@ -155,78 +107,22 @@ Asset ID: 65396714035221124737...
 ======================================================================
 ```
 
-## Command Reference
-
-### wwatcher watch
-
-Start monitoring for large transactions.
-
-Options:
-
-- `-t, --threshold <AMOUNT>` - Minimum transaction size in USD (default: 25000)
-- `-i, --interval <SECONDS>` - Polling interval in seconds (default: 5)
-
-Examples:
-```bash
-wwatcher watch                        # Default: $25k threshold, 5s interval
-wwatcher watch -t 50000               # $50k threshold
-wwatcher watch -i 30                  # Check every 30 seconds
-wwatcher watch -t 100000 -i 60        # $100k threshold, check every minute
-```
-
-### wwatcher setup
-
-Interactive setup wizard to configure API credentials.
+## Commands
 
 ```bash
-wwatcher setup
+wwatcher watch              # Start monitoring
+wwatcher setup              # Configure API and webhook
+wwatcher status             # View configuration
+wwatcher history            # View alert history
 ```
 
-### wwatcher status
+See [QUICKSTART.md](QUICKSTART.md) for detailed command options and examples.
 
-Show current configuration status.
+## Configuration
 
-```bash
-wwatcher status
-```
+Configuration is stored at `~/.config/wwatcher/config.json` (macOS/Linux) or `%APPDATA%\wwatcher\config.json` (Windows).
 
-### wwatcher history
-
-View saved alert history.
-
-Options:
-
-- `-l, --limit <NUMBER>` - Number of alerts to show (default: 20)
-- `-p, --platform <NAME>` - Filter by platform: polymarket, kalshi, or all (default: all)
-- `--json` - Output as JSON
-
-Examples:
-
-```bash
-wwatcher history                              # Show last 20 alerts
-wwatcher history --limit 50                   # Show last 50 alerts
-wwatcher history --platform polymarket        # Show only Polymarket alerts
-wwatcher history --json                       # Export as JSON
-```
-
-Alerts are automatically saved to `~/.config/wwatcher/alert_history.jsonl` whenever transactions are detected.
-
-## Configuration File
-
-Configuration is stored at:
-
-- macOS/Linux: `~/.config/wwatcher/config.json`
-- Windows: `%APPDATA%\wwatcher\config.json`
-
-Example config.json:
- - Kalshi credentials are not needed; they are only used to view your orders or place orders, but there is no functionality for this at the moment.
-```json
-{
-  "kalshi_api_key_id": "your-key-id",
-  "kalshi_private_key": "your-private-key",
-  "webhook_url": "https://your-n8n-instance.com/webhook/whale-alerts"
-}
-```
+Use `wwatcher setup` to configure API credentials and webhook URL. See [QUICKSTART.md](QUICKSTART.md) for webhook integration details.
 
 ## Development
 
