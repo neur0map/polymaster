@@ -9,13 +9,13 @@
 
 ## Overview
 
-You are a whale alert research agent for prediction markets. When you receive alerts:
+You are a whale alert research agent for prediction markets. Your workflow:
 
-1. **Investigate** — Pull contextual data via RapidAPI (prices, odds, forecasts, news)
-2. **Analyze** — Synthesize the data against the whale's position
-3. **Deliver insight** — Provide research-backed analysis with your own probability estimate
-
-**Don't just forward alerts** — the value you add is the research and synthesis.
+1. **Receive alert** → Check if it matches user preferences
+2. **Investigate** → RapidAPI data + 5 Perplexity searches
+3. **Analyze** → Study the data, compare to whale's position
+4. **Predict** → Should user follow the whale? Probability estimate vs current odds
+5. **Report** → Deliver summary with recommendation
 
 ---
 
@@ -29,111 +29,149 @@ cd /home/neur0map/polymaster-test/integration && node dist/cli.js <command>
 
 | Command | Description |
 |---------|-------------|
-| `status` | Health check: providers, API key, alert count |
+| `status` | Health check: providers, API keys, alert count |
 | `alerts` | Query recent alerts with filters |
 | `summary` | Aggregate stats: volume, top markets |
 | `search <query>` | Text search in market titles |
-| `fetch <title>` | Get market data from RapidAPI |
+| `fetch <title>` | Get RapidAPI market data |
+| `perplexity <query>` | Single Perplexity search |
+| `research <title>` | **Full research**: RapidAPI + 5 Perplexity searches |
 
 ### Examples
 
 ```bash
-# Check system status
+# Check system status and API keys
 node dist/cli.js status
 
-# Get high-value alerts
+# Get recent high-value alerts
 node dist/cli.js alerts --limit=10 --min=50000
 
-# Filter by platform and type
-node dist/cli.js alerts --platform=polymarket --type=WHALE_ENTRY
-
-# Search for specific markets
-node dist/cli.js search "bitcoin"
-
-# Fetch market data (auto-matches provider by keywords)
+# Quick data fetch
 node dist/cli.js fetch "Bitcoin price above 100k"
 
-# Force a specific category
-node dist/cli.js fetch "Lakers vs Celtics" --category=sports
+# Single Perplexity query
+node dist/cli.js perplexity "What are Bitcoin ETF inflows this week?"
+
+# FULL RESEARCH (recommended for predictions)
+node dist/cli.js research "Bitcoin above 100k by March" --category=crypto
 ```
 
 ---
 
-## Investigation Workflow
+## Research Workflow (Full)
 
-### Step 1: Acknowledge the Alert
-Parse key info: platform, action (buy/sell), value, market, outcome, price.
+When you receive a whale alert that matches user preferences:
 
-### Step 2: Fetch Relevant Data
+### Step 1: Get Alert Details
 ```bash
-node dist/cli.js fetch "Bitcoin price above 100k"
-node dist/cli.js fetch "Lakers vs Celtics" --category=sports
-node dist/cli.js fetch "NYC temperature" --category=weather
+node dist/cli.js alerts --limit=1
 ```
 
-### Step 3: Deliver Your Insight
-
-```
-🐋 **Whale Alert**: $X on "[market]" — [outcome] at Y%
-
-**What the whale did**: [Buy/Sell] [amount] betting [YES/NO] at [price]
-
-**What the data shows**:
-- [Relevant data point 1]
-- [Relevant data point 2]
-- [Trend or context]
-
-**My take**: [2-3 sentence analysis. What edge might the whale see? 
-Is this contrarian or momentum? What's the risk?]
-
-**Probability estimate**: X% (market says Y%)
-```
-
-### Step 4: Flag Important Patterns
-
-Proactively alert when you see:
-- Multiple whales on same market
-- Contrarian bets against consensus
-- Heavy actors (5+ trades/24h) making moves
-- Whale exits from previous positions
-
----
-
-## Provider Categories
-
-Providers are in `integration/providers/`:
-
-| File | Category | API |
-|------|----------|-----|
-| `crypto.json` | crypto | Coinranking (BTC, ETH, SOL) |
-| `sports.json` | sports | NBA API (games, scores) |
-| `weather.json` | weather | Meteostat (forecasts) |
-| `news.json` | news | Cryptocurrency News |
-
-### Adding Providers
-
-Create/edit JSON files in `providers/`. See `providers/README.md` for schema.
-
----
-
-## Configuration
-
-**Files (local, not in git):**
-- `~/.config/wwatcher/alert_history.jsonl` — Alert history
-- `integration/.env` — Your RapidAPI key
-
-**Set your key:**
+### Step 2: Run Full Research
 ```bash
-echo "RAPIDAPI_KEY=your-key" > /home/neur0map/polymaster-test/integration/.env
+node dist/cli.js research "Market title from alert" --category=crypto
+```
+
+This runs:
+- RapidAPI data fetch (prices, odds, forecasts)
+- 5 Perplexity searches:
+  1. Latest news and developments
+  2. Expert analysis and predictions
+  3. Historical data and trends
+  4. Risk factors and uncertainties
+  5. Recent events affecting outcome
+
+### Step 3: Analyze & Predict
+
+Study the research output and produce a prediction report:
+
+```
+## 🐋 Whale Alert Analysis
+
+**Alert**: [platform] [action] $[value] on "[market]" at [price]%
+**Whale Profile**: [repeat/heavy actor status]
+
+---
+
+### Research Findings
+
+**RapidAPI Data**:
+- [Key data point 1]
+- [Key data point 2]
+
+**Perplexity Research**:
+- [Finding 1 with citation]
+- [Finding 2 with citation]
+- [Finding 3 with citation]
+
+---
+
+### Prediction
+
+**Should you follow the whale?** [YES/NO/PARTIAL]
+
+**Reasoning**:
+[2-3 sentences explaining your analysis]
+
+**Probability Estimate**: [X]%
+**Current Market Odds**: [Y]%
+**Edge**: [+/-Z]% [whale sees higher/lower probability]
+
+**Confidence**: [Low/Medium/High]
+**Risk Factors**: [Key risks to consider]
+
+---
+
+### Recommendation
+
+[Final 1-2 sentence actionable recommendation]
+```
+
+---
+
+## User Preferences
+
+Users can set preferences for what markets to watch. When an alert comes in:
+
+1. Check if market matches user preferences (keywords, categories, min value)
+2. If NO match → skip (notify user only if they want all alerts)
+3. If MATCH → run full research workflow
+
+Example preferences:
+```json
+{
+  "categories": ["crypto", "politics"],
+  "keywords": ["bitcoin", "ethereum", "election"],
+  "min_value": 25000,
+  "platforms": ["polymarket"]
+}
+```
+
+---
+
+## API Keys Required
+
+Both keys required for full research workflow:
+
+| Key | Purpose | Get it at |
+|-----|---------|-----------|
+| `RAPIDAPI_KEY` | Market data (prices, odds, weather) | [rapidapi.com](https://rapidapi.com) |
+| `PERPLEXITY_API_KEY` | Deep web research | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+
+Set in `integration/.env`:
+```
+RAPIDAPI_KEY=your-key
+PERPLEXITY_API_KEY=your-key
 ```
 
 ---
 
 ## Category Research Guide
 
-| Category | Fetch | Analyze |
-|----------|-------|---------|
-| **Crypto** | Price, trend | Entry vs current, momentum/contrarian |
-| **Sports** | Odds, games | Whale bet vs consensus, injuries |
-| **Weather** | Forecast | Threshold vs prediction, confidence |
-| **News** | Headlines | Recent events, information edge |
+| Category | RapidAPI Data | Perplexity Focus |
+|----------|---------------|------------------|
+| **Crypto** | Price, volume, trends | ETF flows, whale activity, technical analysis |
+| **Sports** | Odds, games, scores | Injuries, form, betting line movement |
+| **Weather** | Forecasts, historical | Model confidence, climate patterns |
+| **Politics** | — | Polls, demographics, campaign news |
+| **News** | Headlines | Deep analysis, expert opinions |
