@@ -1,135 +1,122 @@
 # wwatcher AI Agent Instructions
 
-## Environment Detection
+## How It Works
 
-**Read this first to determine your integration path:**
+```
+┌─────────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐     ┌────────────┐
+│  wwatcher   │────▶│   n8n   │────▶│ Telegram │────▶│ AI Agent │────▶│ Prediction │
+│  (Rust CLI) │     │ webhook │     │ message  │     │ research │     │   Report   │
+└─────────────┘     └─────────┘     └──────────┘     └──────────┘     └────────────┘
+```
 
-| If you are... | Use this integration | Jump to section |
-|---------------|---------------------|-----------------|
-| **OpenClaw agent** (skill-based, exec tools) | CLI | [OpenClaw Setup](#openclaw-setup) |
-| **Claude Code / Cursor / MCP client** | MCP Server | [MCP Setup](#mcp-setup) |
-| **Other shell-based agent** | CLI | [OpenClaw Setup](#openclaw-setup) |
-
-**How to tell:**
-- If you have access to `exec` tool and run shell commands → Use **CLI**
-- If you connect via MCP protocol with tool definitions → Use **MCP Server**
-
----
-
-## What This Project Is
-
-**wwatcher** (Whale Watcher) monitors large transactions ("whale bets") on prediction markets:
-- **Polymarket** — crypto-native prediction market
-- **Kalshi** — regulated US prediction market
-
-Alerts are logged to `~/.config/wwatcher/alert_history.jsonl`.
-
-## Your Role
-
-When whale alerts fire, you execute the full research workflow:
-
-1. **Check preferences** → Does alert match user's interests?
-2. **Investigate** → RapidAPI data + 5 Perplexity searches
-3. **Analyze** → Study findings, compare to whale's position
-4. **Predict** → Should user follow? Probability vs current odds
-5. **Report** → Deliver summary with recommendation
-
-**Don't just forward alerts** — add value through research and prediction.
+1. **wwatcher** monitors Polymarket/Kalshi for whale transactions
+2. **Webhook** fires when whale exceeds threshold (e.g., $35K)
+3. **n8n** receives webhook, sends alert to your Telegram chat
+4. **AI Agent** sees the message, runs full research workflow
+5. **Prediction Report** delivered with recommendation
 
 ---
 
-## OpenClaw Setup
+## Setup Guide
 
-### Build & Configure
+### Step 1: Install & Build wwatcher
 
 ```bash
-cd /home/neur0map/polymaster-test/integration
-npm install && npm run build
+# Clone the repo
+git clone https://github.com/neur0map/polymaster.git
+cd polymaster
 
-# Set your API keys (BOTH required for full research)
+# Build the Rust CLI
+cargo build --release
+
+# Install to PATH
+cargo install --path .
+```
+
+### Step 2: Run Setup Wizard
+
+```bash
+wwatcher setup
+```
+
+The wizard will ask:
+- **AI Agent Mode?** → Yes (enables RapidAPI + Perplexity requirements)
+- **Kalshi API** → Optional (works without it)
+- **Webhook URL** → Your n8n webhook (e.g., `https://n8n.example.com/webhook/whale-alerts`)
+- **RapidAPI Key** → Required for AI mode ([rapidapi.com](https://rapidapi.com))
+- **Perplexity Key** → Required for AI mode ([perplexity.ai/settings/api](https://perplexity.ai/settings/api))
+
+### Step 3: Build the AI Integration
+
+```bash
+cd integration
+npm install
+npm run build
+
+# Set API keys
 cat > .env << EOF
-RAPIDAPI_KEY=your-rapidapi-key
-PERPLEXITY_API_KEY=your-perplexity-key
+RAPIDAPI_KEY=your-key
+PERPLEXITY_API_KEY=your-key
 EOF
 
-# Verify
+# Test
 node dist/cli.js status
 ```
 
-### Install Skill
+### Step 4: Configure n8n Workflow
 
-```bash
-mkdir -p ~/.openclaw/skills/wwatcher-ai
-cp skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
+Create an n8n workflow:
+
+**Trigger Node: Webhook**
+- Method: POST
+- Path: `/webhook/whale-alerts`
+
+**Action Node: Telegram**
+- Send Message
+- Chat ID: Your Telegram chat with the AI agent
+- Message:
+```
+🐋 WHALE ALERT
+
+Platform: {{ $json.platform }}
+Action: {{ $json.action }}
+Value: ${{ $json.value }}
+Market: {{ $json.market_title }}
+Outcome: {{ $json.outcome }}
+Price: {{ $json.price_percent }}%
+
+Wallet: {{ $json.wallet_id }}
+Actor Status: {{ $json.wallet_activity.is_heavy_actor ? 'Heavy Actor' : 'Normal' }}
+
+Research this whale alert.
 ```
 
-### CLI Commands
+### Step 5: Start wwatcher
 
 ```bash
-cd /home/neur0map/polymaster-test/integration
+# Run in background with your threshold
+nohup wwatcher watch --threshold 35000 --interval 5 > /tmp/wwatcher.log 2>&1 &
 
-node dist/cli.js status                              # Health check
-node dist/cli.js alerts --limit=10 --min=50000       # Query alerts
-node dist/cli.js summary                             # Aggregate stats
-node dist/cli.js search "bitcoin"                    # Search alerts
-node dist/cli.js fetch "Bitcoin above 100k"          # RapidAPI data only
-node dist/cli.js perplexity "BTC ETF inflows"        # Single Perplexity query
-node dist/cli.js research "Bitcoin above 100k"       # FULL RESEARCH
+# Verify it's running
+tail -f /tmp/wwatcher.log
 ```
 
 ---
 
-## MCP Setup
+## AI Agent Workflow
 
-### Configure MCP Client
+When the AI agent receives a whale alert message, it executes:
 
-```json
-{
-  "mcpServers": {
-    "wwatcher": {
-      "command": "node",
-      "args": ["/home/neur0map/polymaster-test/integration/dist/index.js"],
-      "env": {
-        "RAPIDAPI_KEY": "your-key",
-        "PERPLEXITY_API_KEY": "your-key"
-      }
-    }
-  }
-}
-```
+### 1. Parse the Alert
+Extract: platform, action, value, market, outcome, price, wallet info
 
-### MCP Tools
-
-| Tool | Description |
-|------|-------------|
-| `get_recent_alerts` | Query alerts with filters |
-| `get_alert_summary` | Aggregate stats |
-| `search_alerts` | Text search |
-| `fetch_market_data` | RapidAPI data |
-| `get_wwatcher_status` | Health check |
-
----
-
-## Full Research Workflow
-
-### When You Receive an Alert
-
-#### Step 1: Check User Preferences
-Does this alert match what the user wants to track?
-- Categories: crypto, sports, politics, weather
-- Minimum value threshold
-- Specific keywords
-
-If NO match → skip or notify briefly
-If MATCH → continue to full research
-
-#### Step 2: Run Full Research
+### 2. Run Full Research
 ```bash
-node dist/cli.js research "Market title" --category=crypto
+node dist/cli.js research "Market title" --category=auto
 ```
 
-This executes:
-- **RapidAPI fetch**: Current prices, odds, forecasts
+This runs:
+- **RapidAPI**: Current prices, odds, forecasts
 - **5 Perplexity searches**:
   1. Latest news and developments
   2. Expert analysis and predictions
@@ -137,53 +124,48 @@ This executes:
   4. Risk factors and uncertainties
   5. Recent events affecting outcome
 
-#### Step 3: Analyze the Data
+### 3. Analyze & Predict
 
-Study the research output:
-- What does the current data show?
-- What are experts saying?
-- What risks exist?
-- Why might the whale be making this bet?
+Study the research and determine:
+- What does the data show?
+- Why is the whale making this bet?
+- Is there edge vs market odds?
+- What are the risks?
 
-#### Step 4: Generate Prediction Report
+### 4. Deliver Prediction Report
 
 ```
 ## 🐋 Whale Alert Analysis
 
 **Alert**: [platform] [action] $[value] on "[market]" at [price]%
-**Whale Profile**: [repeat actor? heavy actor?]
+**Whale Profile**: [repeat/heavy actor status]
 
 ---
 
 ### Research Findings
 
-**Market Data (RapidAPI)**:
-- [Current price/odds/forecast]
-- [Trend or momentum]
+**Market Data**:
+- [Key data point 1]
+- [Key data point 2]
 
-**Web Research (Perplexity)**:
-- [Key finding 1 + source]
-- [Key finding 2 + source]
-- [Key finding 3 + source]
-- [Key finding 4 + source]
-- [Key finding 5 + source]
+**Web Research**:
+- [Finding 1 + source]
+- [Finding 2 + source]
+- [Finding 3 + source]
 
 ---
 
 ### Prediction
 
-**Should you follow the whale?** [YES / NO / PARTIAL]
-
-**Reasoning**:
-[2-3 sentences explaining your analysis based on the research]
+**Should you follow?** [YES / NO / PARTIAL]
 
 **Probability Estimate**: [X]%
 **Current Market Odds**: [Y]%
-**Edge**: [+/-Z]% — [whale sees higher/lower probability than market]
+**Edge**: [+/-Z]%
 
 **Confidence**: [Low / Medium / High]
 
-**Key Risk Factors**:
+**Key Risks**:
 - [Risk 1]
 - [Risk 2]
 
@@ -191,44 +173,59 @@ Study the research output:
 
 ### Recommendation
 
-[One clear, actionable sentence]
+[Clear, actionable recommendation]
 ```
 
 ---
 
-## User Preferences
+## CLI Reference
 
-Users can configure what to track:
+```bash
+# From integration/ directory
+cd integration
 
-```json
-{
-  "categories": ["crypto", "politics"],
-  "keywords": ["bitcoin", "ethereum", "election", "trump"],
-  "min_value": 25000,
-  "platforms": ["polymarket"],
-  "alert_on_all": false
-}
+# Health check
+node dist/cli.js status
+
+# Query alerts
+node dist/cli.js alerts --limit=10 --min=35000
+
+# Search alerts
+node dist/cli.js search "bitcoin"
+
+# Fetch market data only (RapidAPI)
+node dist/cli.js fetch "Bitcoin above 100k" --category=crypto
+
+# Single Perplexity query
+node dist/cli.js perplexity "What are Bitcoin ETF inflows?"
+
+# FULL RESEARCH (RapidAPI + 5 Perplexity queries)
+node dist/cli.js research "Bitcoin above 100k" --category=crypto
 ```
 
-When `alert_on_all` is false, only run full research on matching alerts.
+---
+
+## Environment Detection (for AI Agents)
+
+| If you are... | Integration |
+|---------------|-------------|
+| **OpenClaw** (exec tools, skills) | Use CLI commands above |
+| **Claude Code / MCP client** | Use MCP server (`npm run start:mcp`) |
 
 ---
 
 ## API Keys Required
 
-| Key | Purpose | Required | Get it at |
-|-----|---------|----------|-----------|
-| `RAPIDAPI_KEY` | Market data | Yes (for AI) | [rapidapi.com](https://rapidapi.com) |
-| `PERPLEXITY_API_KEY` | Web research | Yes (for AI) | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+| Key | Purpose | Get it at |
+|-----|---------|-----------|
+| `RAPIDAPI_KEY` | Market data | [rapidapi.com](https://rapidapi.com) |
+| `PERPLEXITY_API_KEY` | Web research | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
 
 ### RapidAPI Subscriptions (free tiers)
 
-| Category | API |
-|----------|-----|
-| Crypto | [Coinranking](https://rapidapi.com/Coinranking/api/coinranking1) |
-| Sports | [NBA API](https://rapidapi.com/api-sports/api/nba-api-free-data) |
-| Weather | [Meteostat](https://rapidapi.com/meteostat/api/meteostat) |
-| News | [Crypto News](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) |
+- [Coinranking](https://rapidapi.com/Coinranking/api/coinranking1) (crypto)
+- [Meteostat](https://rapidapi.com/meteostat/api/meteostat) (weather)
+- [Crypto News](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) (news)
 
 ---
 
@@ -236,9 +233,7 @@ When `alert_on_all` is false, only run full research on matching alerts.
 
 | Item | Path |
 |------|------|
+| wwatcher config | `~/.config/wwatcher/config.json` |
 | Alert history | `~/.config/wwatcher/alert_history.jsonl` |
-| Config | `~/.config/wwatcher/config.json` |
-| API keys | `integration/.env` |
+| Integration .env | `integration/.env` |
 | Providers | `integration/providers/` |
-| CLI | `integration/dist/cli.js` |
-| MCP Server | `integration/dist/index.js` |
