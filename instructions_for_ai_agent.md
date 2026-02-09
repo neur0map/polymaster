@@ -26,12 +26,15 @@ Alerts are logged to `~/.config/wwatcher/alert_history.jsonl`.
 
 ## Your Role
 
-When whale alerts fire, you:
-1. **Investigate** — Pull contextual data (prices, odds, forecasts, news)
-2. **Analyze** — Synthesize data against the whale's position
-3. **Deliver insight** — Provide research-backed analysis with probability estimates
+When whale alerts fire, you execute the full research workflow:
 
-**Don't just forward alerts** — add value through research and synthesis.
+1. **Check preferences** → Does alert match user's interests?
+2. **Investigate** → RapidAPI data + 5 Perplexity searches
+3. **Analyze** → Study findings, compare to whale's position
+4. **Predict** → Should user follow? Probability vs current odds
+5. **Report** → Deliver summary with recommendation
+
+**Don't just forward alerts** — add value through research and prediction.
 
 ---
 
@@ -43,8 +46,11 @@ When whale alerts fire, you:
 cd /home/neur0map/polymaster-test/integration
 npm install && npm run build
 
-# Set your API key
-echo "RAPIDAPI_KEY=your-key" > .env
+# Set your API keys (BOTH required for full research)
+cat > .env << EOF
+RAPIDAPI_KEY=your-rapidapi-key
+PERPLEXITY_API_KEY=your-perplexity-key
+EOF
 
 # Verify
 node dist/cli.js status
@@ -59,8 +65,6 @@ cp skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
 
 ### CLI Commands
 
-All commands run from the integration directory:
-
 ```bash
 cd /home/neur0map/polymaster-test/integration
 
@@ -68,20 +72,16 @@ node dist/cli.js status                              # Health check
 node dist/cli.js alerts --limit=10 --min=50000       # Query alerts
 node dist/cli.js summary                             # Aggregate stats
 node dist/cli.js search "bitcoin"                    # Search alerts
-node dist/cli.js fetch "Bitcoin above 100k"          # Fetch market data
-node dist/cli.js fetch "Lakers game" --category=sports
+node dist/cli.js fetch "Bitcoin above 100k"          # RapidAPI data only
+node dist/cli.js perplexity "BTC ETF inflows"        # Single Perplexity query
+node dist/cli.js research "Bitcoin above 100k"       # FULL RESEARCH
 ```
-
-**Alert options:** `--limit`, `--platform`, `--type`, `--min`, `--since`
-**Fetch options:** `--category` (weather, crypto, sports, news)
 
 ---
 
 ## MCP Setup
 
 ### Configure MCP Client
-
-Add to your MCP client config (Claude Code, Cursor, etc.):
 
 ```json
 {
@@ -90,109 +90,145 @@ Add to your MCP client config (Claude Code, Cursor, etc.):
       "command": "node",
       "args": ["/home/neur0map/polymaster-test/integration/dist/index.js"],
       "env": {
-        "RAPIDAPI_KEY": "your-key"
+        "RAPIDAPI_KEY": "your-key",
+        "PERPLEXITY_API_KEY": "your-key"
       }
     }
   }
 }
 ```
 
-### Start Server
-
-```bash
-cd /home/neur0map/polymaster-test/integration
-npm run start:mcp
-```
-
-### MCP Tools Available
+### MCP Tools
 
 | Tool | Description |
 |------|-------------|
 | `get_recent_alerts` | Query alerts with filters |
 | `get_alert_summary` | Aggregate stats |
 | `search_alerts` | Text search |
-| `fetch_market_data` | Pull RapidAPI data |
+| `fetch_market_data` | RapidAPI data |
 | `get_wwatcher_status` | Health check |
 
 ---
 
-## Research Workflow
+## Full Research Workflow
 
 ### When You Receive an Alert
 
-1. **Parse the alert**: platform, action, value, market, outcome, price
-2. **Fetch relevant data**: 
-   ```bash
-   node dist/cli.js fetch "market title" --category=crypto
-   ```
-3. **Analyze**: Compare whale position to market data
-4. **Deliver insight**:
+#### Step 1: Check User Preferences
+Does this alert match what the user wants to track?
+- Categories: crypto, sports, politics, weather
+- Minimum value threshold
+- Specific keywords
 
-```
-🐋 Whale Alert: $50K on "Bitcoin above 100k" — YES at 65%
+If NO match → skip or notify briefly
+If MATCH → continue to full research
 
-What the whale did: Bought $50K YES at 65% implied probability
-
-What the data shows:
-- BTC currently at $97,200, up 3% today
-- 30-day trend: +15%
-- Key resistance at $99,500
-
-My take: Whale is betting on momentum continuation. With BTC 3% from target 
-and strong trend, the 65% price looks reasonable. Risk is rejection at 
-resistance — if it fails twice, expect pullback.
-
-Probability estimate: 60-65% (aligns with market)
+#### Step 2: Run Full Research
+```bash
+node dist/cli.js research "Market title" --category=crypto
 ```
 
-### Category-Specific Research
+This executes:
+- **RapidAPI fetch**: Current prices, odds, forecasts
+- **5 Perplexity searches**:
+  1. Latest news and developments
+  2. Expert analysis and predictions
+  3. Historical data and trends
+  4. Risk factors and uncertainties
+  5. Recent events affecting outcome
 
-| Category | Data Source | Key Analysis |
-|----------|-------------|--------------|
-| Crypto | Coinranking | Price vs entry, momentum/contrarian |
-| Sports | NBA API | Odds vs whale bet, injuries, form |
-| Weather | Meteostat | Forecast vs threshold, confidence |
-| News | Crypto News | Recent events, information edge |
+#### Step 3: Analyze the Data
+
+Study the research output:
+- What does the current data show?
+- What are experts saying?
+- What risks exist?
+- Why might the whale be making this bet?
+
+#### Step 4: Generate Prediction Report
+
+```
+## 🐋 Whale Alert Analysis
+
+**Alert**: [platform] [action] $[value] on "[market]" at [price]%
+**Whale Profile**: [repeat actor? heavy actor?]
 
 ---
 
-## Providers
+### Research Findings
 
-Providers are in `integration/providers/` (one JSON file per category):
+**Market Data (RapidAPI)**:
+- [Current price/odds/forecast]
+- [Trend or momentum]
 
+**Web Research (Perplexity)**:
+- [Key finding 1 + source]
+- [Key finding 2 + source]
+- [Key finding 3 + source]
+- [Key finding 4 + source]
+- [Key finding 5 + source]
+
+---
+
+### Prediction
+
+**Should you follow the whale?** [YES / NO / PARTIAL]
+
+**Reasoning**:
+[2-3 sentences explaining your analysis based on the research]
+
+**Probability Estimate**: [X]%
+**Current Market Odds**: [Y]%
+**Edge**: [+/-Z]% — [whale sees higher/lower probability than market]
+
+**Confidence**: [Low / Medium / High]
+
+**Key Risk Factors**:
+- [Risk 1]
+- [Risk 2]
+
+---
+
+### Recommendation
+
+[One clear, actionable sentence]
 ```
-providers/
-├── crypto.json     # Coinranking
-├── sports.json     # NBA API
-├── weather.json    # Meteostat
-└── news.json       # Crypto News
-```
 
-### Adding Providers
+---
 
-Edit existing category file or create new one:
+## User Preferences
+
+Users can configure what to track:
 
 ```json
 {
-  "provider_key": {
-    "name": "Display Name",
-    "category": "crypto",
-    "rapidapi_host": "api.p.rapidapi.com",
-    "env_key": "RAPIDAPI_KEY",
-    "keywords": ["bitcoin", "btc", "ethereum"],
-    "endpoints": {
-      "price": {
-        "method": "GET",
-        "path": "/v1/price",
-        "description": "Get current price",
-        "params": {}
-      }
-    }
-  }
+  "categories": ["crypto", "politics"],
+  "keywords": ["bitcoin", "ethereum", "election", "trump"],
+  "min_value": 25000,
+  "platforms": ["polymarket"],
+  "alert_on_all": false
 }
 ```
 
-See `providers/README.md` for full schema.
+When `alert_on_all` is false, only run full research on matching alerts.
+
+---
+
+## API Keys Required
+
+| Key | Purpose | Required | Get it at |
+|-----|---------|----------|-----------|
+| `RAPIDAPI_KEY` | Market data | Yes (for AI) | [rapidapi.com](https://rapidapi.com) |
+| `PERPLEXITY_API_KEY` | Web research | Yes (for AI) | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+
+### RapidAPI Subscriptions (free tiers)
+
+| Category | API |
+|----------|-----|
+| Crypto | [Coinranking](https://rapidapi.com/Coinranking/api/coinranking1) |
+| Sports | [NBA API](https://rapidapi.com/api-sports/api/nba-api-free-data) |
+| Weather | [Meteostat](https://rapidapi.com/meteostat/api/meteostat) |
+| News | [Crypto News](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) |
 
 ---
 
@@ -201,21 +237,8 @@ See `providers/README.md` for full schema.
 | Item | Path |
 |------|------|
 | Alert history | `~/.config/wwatcher/alert_history.jsonl` |
-| API key | `integration/.env` |
+| Config | `~/.config/wwatcher/config.json` |
+| API keys | `integration/.env` |
 | Providers | `integration/providers/` |
 | CLI | `integration/dist/cli.js` |
 | MCP Server | `integration/dist/index.js` |
-| Skill | `~/.openclaw/skills/wwatcher-ai/SKILL.md` |
-
----
-
-## RapidAPI Subscriptions
-
-Your single key works for all subscribed APIs (free tiers available):
-
-| Category | API | Link |
-|----------|-----|------|
-| Crypto | Coinranking | [rapidapi.com/Coinranking/api/coinranking1](https://rapidapi.com/Coinranking/api/coinranking1) |
-| Sports | NBA API | [rapidapi.com/api-sports/api/nba-api-free-data](https://rapidapi.com/api-sports/api/nba-api-free-data) |
-| Weather | Meteostat | [rapidapi.com/meteostat/api/meteostat](https://rapidapi.com/meteostat/api/meteostat) |
-| News | Crypto News | [rapidapi.com/Starter-api/api/cryptocurrency-news2](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) |
