@@ -11,19 +11,12 @@ pub enum PolymarketError {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Trade {
-    #[serde(rename = "id")]
     pub id: String,
-    #[serde(rename = "market")]
     pub market: String,
-    #[serde(rename = "asset_id")]
     pub asset_id: String,
-    #[serde(rename = "side")]
     pub side: String,
-    #[serde(rename = "size")]
     pub size: f64,
-    #[serde(rename = "price")]
     pub price: f64,
-    #[serde(rename = "timestamp")]
     pub timestamp: String,
     #[serde(skip)]
     pub market_title: Option<String>,
@@ -47,24 +40,17 @@ struct ActivityItem {
     market: Option<String>,
     #[serde(rename = "asset")]
     asset: Option<String>,
-    #[serde(rename = "side")]
     side: Option<String>,
-    #[serde(rename = "size")]
     size: Option<f64>,
-    #[serde(rename = "price")]
     price: Option<f64>,
-    #[serde(rename = "timestamp")]
     timestamp: Option<i64>,
     #[serde(rename = "name")]
     user: Option<String>,
-    #[serde(rename = "maker")]
     maker: Option<String>,
     #[serde(rename = "proxyWallet")]
     proxy_wallet: Option<String>,
     // New API includes these fields directly
-    #[serde(rename = "title")]
     title: Option<String>,
-    #[serde(rename = "outcome")]
     outcome: Option<String>,
 }
 

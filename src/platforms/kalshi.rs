@@ -12,21 +12,13 @@ pub enum KalshiError {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Trade {
-    #[serde(rename = "trade_id")]
     pub trade_id: String,
-    #[serde(rename = "ticker")]
     pub ticker: String,
-    #[serde(rename = "price")]
     pub price: f64,
-    #[serde(rename = "count")]
     pub count: i32,
-    #[serde(rename = "yes_price")]
     pub yes_price: f64,
-    #[serde(rename = "no_price")]
     pub no_price: f64,
-    #[serde(rename = "taker_side")]
     pub taker_side: String,
-    #[serde(rename = "created_time")]
     pub created_time: String,
     #[serde(skip)]
     pub market_title: Option<String>,
@@ -152,7 +144,7 @@ pub fn parse_ticker_details(ticker: &str, side: &str) -> String {
                     "Asset"
                 };
 
-                return format!("{} price {} ${} at expiry", asset, 
+                return format!("{} price {} ${} at expiry", asset,
                     if betting_side == "YES" { "≥" } else { "<" }, price);
             }
         }
@@ -198,7 +190,7 @@ pub fn parse_ticker_details(ticker: &str, side: &str) -> String {
                     }
                 }
 
-                return format!("Total points {} {} ({})", 
+                return format!("Total points {} {} ({})",
                     if betting_side == "YES" { "OVER" } else { "UNDER" },
                     threshold, sport);
             }
