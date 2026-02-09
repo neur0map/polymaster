@@ -3,17 +3,20 @@
  * wwatcher-ai CLI — OpenClaw-compatible interface for whale alert research
  * 
  * Commands:
- *   status                     Health check: history file, alert count, providers, API key
+ *   status                     Health check: history file, alert count, providers, API keys
  *   alerts [options]           Query recent alerts with filters
  *   summary                    Aggregate stats: volume, top markets, whale counts
  *   search <query>             Search alerts by market title/outcome text
  *   fetch <market_title>       Fetch RapidAPI data for a market (crypto/sports/weather/news)
+ *   perplexity <query>         Run a single Perplexity search
+ *   research <market_title>    Full research: RapidAPI + 5 Perplexity searches + analysis
  */
 
 import * as fs from "fs";
 import { AlertStore } from "./watcher/alert-store.js";
 import { ProviderRegistry } from "./providers/registry.js";
 import { fetchAutoFromProvider } from "./providers/fetcher.js";
+import { queryPerplexity, runResearchQueries, generateResearchQueries } from "./providers/perplexity.js";
 import { loadEnv } from "./util/env.js";
 
 interface CliOptions {
@@ -23,6 +26,7 @@ interface CliOptions {
   minValue?: number;
   since?: string;
   category?: string;
+  queries?: number;
 }
 
 function parseArgs(args: string[]): { command: string; positional: string[]; options: CliOptions } {
@@ -56,6 +60,10 @@ function parseArgs(args: string[]): { command: string; positional: string[]; opt
         case "cat":
           options.category = value;
           break;
+        case "queries":
+        case "q":
+          options.queries = parseInt(value, 10);
+          break;
       }
     } else if (arg.startsWith("-")) {
       // Short flags
@@ -80,6 +88,9 @@ function parseArgs(args: string[]): { command: string; positional: string[]; opt
         case "c":
           options.category = value;
           break;
+        case "q":
+          options.queries = parseInt(value, 10);
+          break;
       }
     } else {
       positional.push(arg);
@@ -97,11 +108,13 @@ USAGE:
   wwatcher-ai <command> [options]
 
 COMMANDS:
-  status                     Health check: history file, alert count, providers, API key
+  status                     Health check: history file, alert count, providers, API keys
   alerts                     Query recent alerts with filters
   summary                    Aggregate stats: volume, top markets, whale counts
   search <query>             Search alerts by market title/outcome text
   fetch <market_title>       Fetch RapidAPI data for a market
+  perplexity <query>         Run a single Perplexity search
+  research <market_title>    Full research: RapidAPI + Perplexity searches + prediction
 
 ALERT OPTIONS:
   --limit=N, -l N            Max alerts to return (default: 20)
@@ -110,17 +123,16 @@ ALERT OPTIONS:
   --min=N, -m N              Minimum transaction value in USD
   --since=ISO, -s ISO        Only alerts after this timestamp
 
-FETCH OPTIONS:
-  --category=X, -c X         Override category (weather, crypto, sports, news)
+FETCH/RESEARCH OPTIONS:
+  --category=X, -c X         Override category (weather, crypto, sports, news, politics)
+  --queries=N, -q N          Number of Perplexity queries for research (default: 5)
 
 EXAMPLES:
   wwatcher-ai status
   wwatcher-ai alerts --limit=10 --min=50000
-  wwatcher-ai alerts --platform=polymarket --type=WHALE_ENTRY
-  wwatcher-ai summary
-  wwatcher-ai search "bitcoin"
   wwatcher-ai fetch "Bitcoin price above 100k"
-  wwatcher-ai fetch "Lakers vs Celtics" --category=sports
+  wwatcher-ai perplexity "What are the latest Bitcoin ETF inflows?"
+  wwatcher-ai research "Bitcoin above 100k by March" --category=crypto
 `);
 }
 
@@ -164,9 +176,13 @@ async function main(): Promise<void> {
         },
         providers: {
           count: providers.length,
+          categories: registry.categories(),
           list: providers,
         },
-        api_key_configured: !!env.rapidApiKey,
+        api_keys: {
+          rapidapi: !!env.rapidApiKey,
+          perplexity: !!env.perplexityApiKey,
+        },
       };
       console.log(JSON.stringify(result, null, 2));
       break;
@@ -240,7 +256,7 @@ async function main(): Promise<void> {
         const matches = registry.match(marketTitle, options.category);
         console.log(JSON.stringify({
           error: "RAPIDAPI_KEY not configured",
-          help: "Set RAPIDAPI_KEY in integration/.env or as environment variable. Get your key at https://rapidapi.com",
+          help: "Set RAPIDAPI_KEY in integration/.env",
           matched_providers: matches.map((m) => ({
             provider: m.provider.name,
             category: m.provider.category,
@@ -261,7 +277,6 @@ async function main(): Promise<void> {
         break;
       }
 
-      // Fetch from matching providers (exclude match_all unless explicit category)
       const providersToFetch = options.category
         ? matches
         : matches.filter((m) => !m.provider.match_all || matches.length === 1);
@@ -287,6 +302,114 @@ async function main(): Promise<void> {
           data: r.data,
         })),
       }, null, 2));
+      break;
+    }
+
+    case "perplexity": {
+      const query = positional.join(" ");
+      if (!query) {
+        console.error(JSON.stringify({ error: "Query required. Usage: wwatcher-ai perplexity <query>" }));
+        process.exit(1);
+      }
+
+      if (!env.perplexityApiKey) {
+        console.log(JSON.stringify({
+          error: "PERPLEXITY_API_KEY not configured",
+          help: "Set PERPLEXITY_API_KEY in integration/.env. Get your key at https://perplexity.ai/settings/api",
+        }, null, 2));
+        process.exit(1);
+      }
+
+      const result = await queryPerplexity(query, env.perplexityApiKey);
+      console.log(JSON.stringify({
+        query: result.query,
+        answer: result.answer,
+        citations: result.citations,
+        error: result.error,
+      }, null, 2));
+      break;
+    }
+
+    case "research": {
+      const marketTitle = positional.join(" ");
+      if (!marketTitle) {
+        console.error(JSON.stringify({ error: "Market title required. Usage: wwatcher-ai research <market_title>" }));
+        process.exit(1);
+      }
+
+      const missingKeys: string[] = [];
+      if (!env.rapidApiKey) missingKeys.push("RAPIDAPI_KEY");
+      if (!env.perplexityApiKey) missingKeys.push("PERPLEXITY_API_KEY");
+
+      if (missingKeys.length > 0) {
+        console.log(JSON.stringify({
+          error: `Missing API keys: ${missingKeys.join(", ")}`,
+          help: "Full research requires both RAPIDAPI_KEY and PERPLEXITY_API_KEY in integration/.env",
+        }, null, 2));
+        process.exit(1);
+      }
+
+      // Step 1: Fetch RapidAPI data
+      const matches = registry.match(marketTitle, options.category);
+      let rapidApiResults: any[] = [];
+
+      if (matches.length > 0) {
+        const providersToFetch = options.category
+          ? matches
+          : matches.filter((m) => !m.provider.match_all || matches.length === 1);
+
+        rapidApiResults = await Promise.all(
+          providersToFetch.map((m) =>
+            fetchAutoFromProvider(m.provider, marketTitle, env.rapidApiKey!)
+          )
+        );
+      }
+
+      // Step 2: Run Perplexity searches
+      const numQueries = options.queries || 5;
+      const queries = generateResearchQueries(marketTitle, options.category).slice(0, numQueries);
+      const perplexityResults = await runResearchQueries(
+        marketTitle,
+        env.perplexityApiKey!,
+        options.category,
+        queries
+      );
+
+      // Step 3: Compile research report
+      const report = {
+        market_title: marketTitle,
+        category: options.category || (matches[0]?.provider.category ?? "general"),
+        timestamp: new Date().toISOString(),
+        rapidapi_data: {
+          providers_matched: matches.map((m) => ({
+            name: m.provider.name,
+            category: m.provider.category,
+          })),
+          results: rapidApiResults.map((r) => ({
+            provider: r.provider,
+            status: r.status,
+            data: r.data,
+            error: r.error,
+          })),
+        },
+        perplexity_research: {
+          queries_run: perplexityResults.queries.length,
+          results: perplexityResults.results.map((r) => ({
+            query: r.query,
+            answer: r.answer,
+            citations: r.citations,
+            error: r.error,
+          })),
+        },
+        research_summary: {
+          data_sources: matches.length + perplexityResults.queries.length,
+          rapidapi_providers: matches.length,
+          perplexity_queries: perplexityResults.queries.length,
+          successful_queries: perplexityResults.results.filter(r => !r.error).length,
+        },
+      };
+
+      console.log(JSON.stringify(report, null, 2));
       break;
     }
 

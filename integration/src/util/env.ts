@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 export interface EnvConfig {
   historyPath: string;
   rapidApiKey: string | undefined;
+  perplexityApiKey: string | undefined;
   providersConfigPath: string;
 }
 
@@ -38,6 +39,7 @@ export function loadEnv(): EnvConfig {
   return {
     historyPath,
     rapidApiKey: process.env.RAPIDAPI_KEY || undefined,
+    perplexityApiKey: process.env.PERPLEXITY_API_KEY || undefined,
     providersConfigPath,
   };
 }
