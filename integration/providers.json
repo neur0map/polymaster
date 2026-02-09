@@ -1,72 +1,54 @@
 {
   "weather": {
-    "name": "Open Weather",
+    "name": "Meteostat",
     "category": "weather",
-    "rapidapi_host": "open-weather13.p.rapidapi.com",
+    "rapidapi_host": "meteostat.p.rapidapi.com",
     "env_key": "RAPIDAPI_KEY",
     "keywords": ["temperature", "weather", "forecast", "high temp", "low temp", "rain", "snow"],
     "endpoints": {
-      "five_day_forecast": {
+      "daily": {
         "method": "GET",
-        "path": "/city/fivedaysforcast/{latitude}/{longitude}/EN",
-        "description": "5-day weather forecast for a location",
+        "path": "/point/daily",
+        "description": "Daily weather data for a location",
         "params": {
-          "latitude": { "type": "number", "required": true, "description": "Location latitude" },
-          "longitude": { "type": "number", "required": true, "description": "Location longitude" }
+          "lat": { "type": "number", "required": true, "description": "Latitude", "default": 40.7128 },
+          "lon": { "type": "number", "required": true, "description": "Longitude", "default": -74.006 },
+          "start": { "type": "string", "required": true, "description": "Start date", "default": "2026-02-09" },
+          "end": { "type": "string", "required": true, "description": "End date", "default": "2026-02-09" }
         }
       }
     }
   },
   "crypto": {
-    "name": "CoinMarketCap",
+    "name": "Coinranking",
     "category": "crypto",
-    "rapidapi_host": "coinmarketcap-api1.p.rapidapi.com",
+    "rapidapi_host": "coinranking1.p.rapidapi.com",
     "env_key": "RAPIDAPI_KEY",
     "keywords": ["bitcoin", "BTC", "ethereum", "ETH", "solana", "SOL", "crypto", "price"],
     "endpoints": {
-      "latest_quotes": {
+      "coin_price": {
         "method": "GET",
-        "path": "/v1/cryptocurrency/quotes/latest",
-        "description": "Latest price quotes for cryptocurrencies",
+        "path": "/coin/{coinId}/price",
+        "description": "Get current price for a coin",
         "params": {
-          "symbol": { "type": "string", "required": true, "description": "Crypto symbol (BTC,ETH)" }
-        }
-      }
-    }
-  },
-  "sports": {
-    "name": "The Odds API",
-    "category": "sports",
-    "rapidapi_host": "therundown-therundown-v1.p.rapidapi.com",
-    "env_key": "RAPIDAPI_KEY",
-    "keywords": ["NFL", "NBA", "NHL", "MLB", "game", "win", "spread", "total points", "soccer"],
-    "endpoints": {
-      "odds": {
-        "method": "GET",
-        "path": "/sports/{sport}/odds",
-        "description": "Current odds for upcoming games",
-        "params": {
-          "sport": { "type": "string", "required": true, "description": "Sport key (e.g., basketball_nba)" }
+          "coinId": { "type": "string", "required": true, "description": "Coin UUID (BTC: Qwsogvtv82FCd)", "default": "Qwsogvtv82FCd" }
         }
       }
     }
   },
   "news": {
-    "name": "Newscatcher",
+    "name": "Cryptocurrency News",
     "category": "news",
-    "rapidapi_host": "newscatcher.p.rapidapi.com",
+    "rapidapi_host": "cryptocurrency-news2.p.rapidapi.com",
     "env_key": "RAPIDAPI_KEY",
     "keywords": [],
     "match_all": true,
     "endpoints": {
-      "search": {
+      "coindesk": {
         "method": "GET",
-        "path": "/v2/search",
-        "description": "Search news articles by keyword",
-        "params": {
-          "q": { "type": "string", "required": true, "description": "Search query" },
-          "lang": { "type": "string", "required": false, "default": "en" }
-        }
+        "path": "/v1/coindesk",
+        "description": "Latest crypto news from CoinDesk",
+        "params": {}
       }
     }
   }
