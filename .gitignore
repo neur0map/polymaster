@@ -15,3 +15,4 @@ Cargo.lock
 
 # Config (contains API keys)
 config.json
+/integration/node_modules
