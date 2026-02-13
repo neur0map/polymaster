@@ -163,9 +163,25 @@ pub async fn watch_whales(threshold: u64, interval: u64, conn: Connection) -> Re
                 let outcome = kalshi::parse_ticker_details(&trade.ticker, &trade.taker_side);
                 let action = trade.taker_side.to_uppercase();
 
+                // Fetch market context early for filtering
+                let market_ctx = kalshi::fetch_market_context(&trade.ticker).await;
+
+                // Odds and spread filter
+                if let Some(ref cfg) = config {
+                    if let Some(ref ctx) = market_ctx {
+                        // Skip if odds too high (near-certainty)
+                        if ctx.yes_price > cfg.max_odds || ctx.no_price > cfg.max_odds {
+                            continue;
+                        }
+                        // Skip if spread too low (dead market)
+                        if cfg.min_spread > 0.0 && ctx.spread < cfg.min_spread {
+                            continue;
+                        }
+                    }
+                }
+
                 print_kalshi_alert(&trade, trade_value, None);
 
-                let market_ctx = kalshi::fetch_market_context(&trade.ticker).await;
                 if let Some(ref ctx) = market_ctx {
                     print_market_context(ctx);
                 }
@@ -248,6 +264,23 @@ pub async fn watch_whales(threshold: u64, interval: u64, conn: Connection) -> Re
                                 )
                             });
 
+                            // Fetch market context early for filtering
+                            let market_ctx = polymarket::fetch_market_context(&trade.market).await;
+
+                            // Odds and spread filter
+                            if let Some(ref cfg) = config {
+                                if let Some(ref ctx) = market_ctx {
+                                    // Skip if odds too high (near-certainty)
+                                    if ctx.yes_price > cfg.max_odds || ctx.no_price > cfg.max_odds {
+                                        continue;
+                                    }
+                                    // Skip if spread too low (dead market)
+                                    if cfg.min_spread > 0.0 && ctx.spread < cfg.min_spread {
+                                        continue;
+                                    }
+                                }
+                            }
+
                             // Print returning whale info if detected
                             if let Some(ref scenario) = whale_scenario {
                                 display::print_returning_whale(scenario, "Polymarket");
@@ -260,8 +293,6 @@ pub async fn watch_whales(threshold: u64, interval: u64, conn: Connection) -> Re
                                 wallet_activity.as_ref(),
                             );
 
-                            // Fetch edge data (1 extra API call per whale alert)
-                            let market_ctx = polymarket::fetch_market_context(&trade.market).await;
                             if let Some(ref ctx) = market_ctx {
                                 print_market_context(ctx);
                             }
@@ -382,10 +413,25 @@ pub async fn watch_whales(threshold: u64, interval: u64, conn: Connection) -> Re
 
                             let action = trade.taker_side.to_uppercase();
 
+                            // Fetch market context early for filtering
+                            let market_ctx = kalshi::fetch_market_context(&trade.ticker).await;
+
+                            // Odds and spread filter
+                            if let Some(ref cfg) = config {
+                                if let Some(ref ctx) = market_ctx {
+                                    // Skip if odds too high (near-certainty)
+                                    if ctx.yes_price > cfg.max_odds || ctx.no_price > cfg.max_odds {
+                                        continue;
+                                    }
+                                    // Skip if spread too low (dead market)
+                                    if cfg.min_spread > 0.0 && ctx.spread < cfg.min_spread {
+                                        continue;
+                                    }
+                                }
+                            }
+
                             print_kalshi_alert(trade, trade_value, None);
 
-                            // Fetch edge data for Kalshi
-                            let market_ctx = kalshi::fetch_market_context(&trade.ticker).await;
                             if let Some(ref ctx) = market_ctx {
                                 print_market_context(ctx);
                             }

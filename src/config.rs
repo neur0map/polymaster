@@ -26,6 +26,14 @@ pub struct Config {
     /// Days to retain alerts in the database (0 = keep forever)
     #[serde(default = "default_retention_days")]
     pub history_retention_days: u32,
+    /// Maximum odds to alert on (0.0-1.0). Skip if YES or NO price exceeds this.
+    /// Default 0.95 filters out near-certainties with no edge.
+    #[serde(default = "default_max_odds")]
+    pub max_odds: f64,
+    /// Minimum spread to alert on. Skip dead/settled markets with 0 spread.
+    /// Default 0.0 (disabled).
+    #[serde(default = "default_min_spread")]
+    pub min_spread: f64,
 }
 
 fn default_categories() -> Vec<String> {
@@ -42,6 +50,14 @@ fn default_platforms() -> Vec<String> {
 
 fn default_retention_days() -> u32 {
     30
+}
+
+fn default_max_odds() -> f64 {
+    0.95
+}
+
+fn default_min_spread() -> f64 {
+    0.0
 }
 
 fn config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {

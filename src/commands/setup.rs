@@ -416,6 +416,8 @@ pub async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
         threshold,
         platforms: platforms.clone(),
         history_retention_days,
+        max_odds: existing.max_odds,
+        min_spread: existing.min_spread,
     };
 
     crate::config::save_config(&config)?;
