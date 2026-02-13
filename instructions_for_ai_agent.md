@@ -4,16 +4,17 @@
 
 ```
 ┌─────────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐     ┌────────────┐
-│  wwatcher   │────▶│   n8n   │────▶│ Telegram │────▶│ AI Agent │────▶│ Prediction │
-│  (Rust CLI) │     │ webhook │     │ message  │     │ research │     │   Report   │
-└─────────────┘     └─────────┘     └──────────┘     └──────────┘     └────────────┘
+│  wwatcher   │────▶│   n8n   │────▶│ Telegram │────▶│ AI Agent │────▶│ Structured │
+│  (Rust CLI) │     │ webhook │     │ message  │     │ score +  │     │   Signal   │
+└─────────────┘     └─────────┘     └──────────┘     │ research │     └────────────┘
+                                                      └──────────┘
 ```
 
 1. **wwatcher** monitors Polymarket/Kalshi for whale transactions
-2. **Webhook** fires when whale exceeds threshold (e.g., $35K)
-3. **n8n** receives webhook, sends alert to your Telegram chat
-4. **AI Agent** sees the message, runs full research workflow
-5. **Prediction Report** delivered with recommendation
+2. **Webhook** fires with enriched payload (whale profile, order book, market context, top holders)
+3. **n8n** receives webhook, sends alert to your messaging platform
+4. **AI Agent** scores the alert, checks user preferences, runs context-aware research
+5. **Structured Signal** delivered with direction, confidence, and key factors
 
 ---
 
@@ -22,14 +23,8 @@
 ### Step 1: Install & Build wwatcher
 
 ```bash
-# Clone the repo
 git clone https://github.com/neur0map/polymaster.git
 cd polymaster
-
-# Build the Rust CLI
-cargo build --release
-
-# Install to PATH
 cargo install --path .
 ```
 
@@ -39,12 +34,13 @@ cargo install --path .
 wwatcher setup
 ```
 
-The wizard will ask:
-- **AI Agent Mode?** → Yes (enables RapidAPI + Perplexity requirements)
-- **Kalshi API** → Optional (works without it)
-- **Webhook URL** → Your n8n webhook (e.g., `https://n8n.example.com/webhook/whale-alerts`)
-- **RapidAPI Key** → Required for AI mode ([rapidapi.com](https://rapidapi.com))
-- **Perplexity Key** → Required for AI mode ([perplexity.ai/settings/api](https://perplexity.ai/settings/api))
+The wizard configures:
+- **Platforms** — Polymarket, Kalshi, or both
+- **Categories** — Sports, Crypto, Politics, Economics, etc.
+- **Threshold & Retention** — Minimum trade size and history retention
+- **API Keys** — Optional Kalshi credentials
+- **AI Agent Mode** — Optional RapidAPI + Perplexity keys
+- **Webhook URL** — Your n8n endpoint
 
 ### Step 3: Build the AI Integration
 
@@ -55,8 +51,8 @@ npm run build
 
 # Set API keys
 cat > .env << EOF
-RAPIDAPI_KEY=your-key
 PERPLEXITY_API_KEY=your-key
+RAPIDAPI_KEY=your-key
 EOF
 
 # Test
@@ -71,136 +67,151 @@ Create an n8n workflow:
 - Method: POST
 - Path: `/webhook/whale-alerts`
 
-**Action Node: Telegram**
-- Send Message
-- Chat ID: Your Telegram chat with the AI agent
-- Message:
-```
-🐋 WHALE ALERT
-
-Platform: {{ $json.platform }}
-Action: {{ $json.action }}
-Value: ${{ $json.value }}
-Market: {{ $json.market_title }}
-Outcome: {{ $json.outcome }}
-Price: {{ $json.price_percent }}%
-
-Wallet: {{ $json.wallet_id }}
-Actor Status: {{ $json.wallet_activity.is_heavy_actor ? 'Heavy Actor' : 'Normal' }}
-
-Research this whale alert.
-```
+**Action Node: Telegram/Discord/Slack**
+- Send the full alert JSON to your AI agent's chat
+- Include "Research this whale alert." to trigger the skill
 
 ### Step 5: Start wwatcher
 
 ```bash
-# Run in background with your threshold
-nohup wwatcher watch --threshold 35000 --interval 5 > /tmp/wwatcher.log 2>&1 &
-
-# Verify it's running
-tail -f /tmp/wwatcher.log
+wwatcher watch --threshold 35000 --interval 5
 ```
 
 ---
 
 ## AI Agent Workflow
 
-When the AI agent receives a whale alert message, it executes:
+When the AI agent receives a whale alert, it executes this workflow:
 
 ### 1. Parse the Alert
-Extract: platform, action, value, market, outcome, price, wallet info
 
-### 2. Run Full Research
+Extract the full enriched payload including:
+- **Core**: platform, action, value, price, market_title, outcome, timestamp
+- **Wallet**: wallet_id, wallet_activity (repeat/heavy actor, txn counts)
+- **Whale Profile**: leaderboard_rank, win_rate, portfolio_value, positions_count
+- **Market Context**: yes_price, no_price, spread, volume_24h, open_interest, tags
+- **Order Book**: best_bid, best_ask, bid_depth_10pct, ask_depth_10pct
+- **Top Holders**: top 5 holders with shares and percentages
+
+### 2. Check User Preferences
+
+Load preferences from memory key `wwatcher_preferences`. If any filter fails, silently skip.
+
+Preference fields (all optional):
+- `min_value` — Minimum trade size (e.g., 100000)
+- `min_win_rate` — Minimum whale win rate (e.g., 0.6)
+- `max_leaderboard_rank` — Maximum rank (e.g., 100)
+- `platforms` — Platform filter (e.g., ["polymarket"])
+- `categories` — Category filter (e.g., ["crypto", "politics"])
+- `directions` — Action filter (e.g., ["buy"])
+- `tier_filter` — Minimum tier ("high" or "medium")
+
+Natural language examples:
+- "Only alert me on whales with 60%+ win rate" → `{ "min_win_rate": 0.6 }`
+- "Skip anything under $100k" → `{ "min_value": 100000 }`
+- "Top 100 leaderboard traders only" → `{ "max_leaderboard_rank": 100 }`
+- "Only high tier alerts" → `{ "tier_filter": "high" }`
+
+### 3. Score + Context-Aware Research
+
 ```bash
-node dist/cli.js research "Market title" --category=auto
+node dist/cli.js research "Market title" --context='<full_alert_json>'
 ```
 
-This runs:
-- **RapidAPI**: Current prices, odds, forecasts
-- **5 Perplexity searches**:
-  1. Latest news and developments
-  2. Expert analysis and predictions
-  3. Historical data and trends
-  4. Risk factors and uncertainties
-  5. Recent events affecting outcome
+This single command:
+1. **Scores** the alert (tier: high/medium/low + factors list)
+2. **Generates 3 targeted Perplexity queries** based on score factors (not 5 generic ones)
+3. **Fetches prediction market data** — related markets, cross-platform match (no API key needed)
+4. **Fetches RapidAPI data** if relevant providers match the category
+5. **Returns a structured signal** with direction, confidence, and factors
 
-### 3. Analyze & Predict
-
-Study the research and determine:
-- What does the data show?
-- Why is the whale making this bet?
-- Is there edge vs market odds?
-- What are the risks?
-
-### 4. Deliver Prediction Report
+### 4. Deliver Structured Signal
 
 ```
-## 🐋 Whale Alert Analysis
+WHALE SIGNAL: [market_title]
 
-**Alert**: [platform] [action] $[value] on "[market]" at [price]%
-**Whale Profile**: [repeat/heavy actor status]
+Direction: [BULLISH/BEARISH] | Confidence: [HIGH/MEDIUM/LOW]
+
+Key Factors:
+- [factor 1]
+- [factor 2]
+- [factor 3]
+
+Whale: [whale_quality summary]
+Book: [market_pressure summary]
+
+Research: [2-3 sentence research_summary]
+
+Cross-Platform: [if cross_platform match found, show title + price]
+Related Markets: [if related markets found, list top 2-3]
+```
 
 ---
 
-### Research Findings
+## Alert Scoring
 
-**Market Data**:
-- [Key data point 1]
-- [Key data point 2]
+Every alert is scored based on whale profile, trade size, order book, and position type:
 
-**Web Research**:
-- [Finding 1 + source]
-- [Finding 2 + source]
-- [Finding 3 + source]
+| Factor | Signal | Score |
+|--------|--------|-------|
+| Leaderboard top 10 | Elite trader | +30 |
+| Leaderboard top 50 | Strong trader | +25 |
+| Leaderboard top 100 | Known trader | +20 |
+| Leaderboard top 500 | Ranked trader | +10 |
+| Win rate >= 80% | Elite accuracy | +20 |
+| Win rate >= 70% | Strong accuracy | +15 |
+| Win rate >= 60% | Above average | +10 |
+| Heavy actor (5+ txns/24h) | High conviction | +15 |
+| Repeat actor (2+ txns/1h) | Active trader | +10 |
+| Trade >= $250k | Massive bet | +20 |
+| Trade >= $100k | Large bet | +15 |
+| Trade >= $50k | Significant bet | +10 |
+| Bid imbalance >= 65% | Directional pressure | +10 |
+| Contrarian position | Against consensus | +15 |
+| Portfolio >= $1M | Whale portfolio | +10 |
 
----
-
-### Prediction
-
-**Should you follow?** [YES / NO / PARTIAL]
-
-**Probability Estimate**: [X]%
-**Current Market Odds**: [Y]%
-**Edge**: [+/-Z]%
-
-**Confidence**: [Low / Medium / High]
-
-**Key Risks**:
-- [Risk 1]
-- [Risk 2]
-
----
-
-### Recommendation
-
-[Clear, actionable recommendation]
-```
+**Tier thresholds:**
+- **High**: score >= 60 — Top trader, large bet, strong signals
+- **Medium**: score >= 35 — Known trader or significant trade
+- **Low**: score < 35 — Unknown trader, smaller trade
 
 ---
 
 ## CLI Reference
 
 ```bash
-# From integration/ directory
 cd integration
 
 # Health check
 node dist/cli.js status
 
-# Query alerts
-node dist/cli.js alerts --limit=10 --min=35000
+# Query alerts (enriched with whale profile, order book, tags)
+node dist/cli.js alerts --limit=10 --min=50000
+node dist/cli.js alerts --platform=polymarket --type=WHALE_ENTRY
 
-# Search alerts
+# Aggregate stats (avg whale rank, avg bid depth)
+node dist/cli.js summary
+
+# Search alerts (titles, outcomes, tags)
 node dist/cli.js search "bitcoin"
 
-# Fetch market data only (RapidAPI)
-node dist/cli.js fetch "Bitcoin above 100k" --category=crypto
+# Score an alert — returns tier + factors
+node dist/cli.js score '<alert_json>'
 
-# Single Perplexity query
+# Context-aware research — scoring + targeted queries + structured signal
+node dist/cli.js research "Bitcoin above 100k" --context='<alert_json>'
+
+# Generic research (no alert context)
+node dist/cli.js research "Bitcoin above 100k" --category=crypto
+
+# RapidAPI data only
+node dist/cli.js fetch "Bitcoin price above 100k"
+
+# Single Perplexity search
 node dist/cli.js perplexity "What are Bitcoin ETF inflows?"
 
-# FULL RESEARCH (RapidAPI + 5 Perplexity queries)
-node dist/cli.js research "Bitcoin above 100k" --category=crypto
+# Show user preference schema
+node dist/cli.js preferences show
 ```
 
 ---
@@ -210,22 +221,37 @@ node dist/cli.js research "Bitcoin above 100k" --category=crypto
 | If you are... | Integration |
 |---------------|-------------|
 | **OpenClaw** (exec tools, skills) | Use CLI commands above |
-| **Claude Code / MCP client** | Use MCP server (`npm run start:mcp`) |
+| **MCP client** (Claude Code, etc.) | Use MCP server (`npm run start:mcp`) |
 
 ---
 
-## API Keys Required
+## API Keys
 
-| Key | Purpose | Get it at |
-|-----|---------|-----------|
-| `RAPIDAPI_KEY` | Market data | [rapidapi.com](https://rapidapi.com) |
-| `PERPLEXITY_API_KEY` | Web research | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+| Key | Required | Purpose | Get it at |
+|-----|----------|---------|-----------|
+| `PERPLEXITY_API_KEY` | For research | Web-based analysis | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+| `RAPIDAPI_KEY` | Optional | Market data enrichment | [rapidapi.com](https://rapidapi.com) |
+
+Prediction market data (related markets, cross-platform matching) requires **no API keys**.
 
 ### RapidAPI Subscriptions (free tiers)
 
-- [Coinranking](https://rapidapi.com/Coinranking/api/coinranking1) (crypto)
+- [Coinranking](https://rapidapi.com/Coinranking/api/coinranking1) (crypto prices)
+- [NBA API](https://rapidapi.com/api-sports/api/nba-api-free-data) (sports)
 - [Meteostat](https://rapidapi.com/meteostat/api/meteostat) (weather)
 - [Crypto News](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) (news)
+
+---
+
+## Category Guide
+
+| Category | RapidAPI Data | Research Focus |
+|----------|---------------|----------------|
+| crypto | Coinranking prices | On-chain data, institutional flows, technicals |
+| sports | Game data | Injuries, odds movement, matchups |
+| weather | Meteostat forecast | Model confidence, patterns |
+| politics | — | Polls, demographics, developments |
+| prediction-markets | Polymarket/Kalshi | Related markets, cross-platform, price history |
 
 ---
 
@@ -234,6 +260,7 @@ node dist/cli.js research "Bitcoin above 100k" --category=crypto
 | Item | Path |
 |------|------|
 | wwatcher config | `~/.config/wwatcher/config.json` |
-| Alert history | `~/.config/wwatcher/alert_history.jsonl` |
+| Alert database | `~/.config/wwatcher/wwatcher.db` |
 | Integration .env | `integration/.env` |
 | Providers | `integration/providers/` |
+| OpenClaw skill | `integration/skill/SKILL.md` |

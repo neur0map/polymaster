@@ -240,7 +240,7 @@ Or manually edit config file at `~/.config/wwatcher/config.json`:
 
 ### Webhook Payload Format
 
-Polymaster sends HTTP POST requests with this JSON structure:
+Polymaster sends HTTP POST requests with enriched JSON payloads. See [`docs/WEBHOOK_REFERENCE.md`](docs/WEBHOOK_REFERENCE.md) for the complete schema.
 
 ```json
 {
@@ -251,9 +251,9 @@ Polymaster sends HTTP POST requests with this JSON structure:
   "price": 0.75,
   "size": 66666.67,
   "timestamp": "2026-01-09T06:00:00Z",
-  "market_title": "Will Trump win the 2024 Presidential Election?",
+  "market_title": "Will Bitcoin reach 100k by end of 2026?",
   "outcome": "Yes",
-  "wallet_id": "0x1234567890abcdef1234567890abcdef12345678",
+  "wallet_id": "0x1234...5678",
   "wallet_activity": {
     "transactions_last_hour": 3,
     "transactions_last_day": 5,
@@ -261,30 +261,56 @@ Polymaster sends HTTP POST requests with this JSON structure:
     "total_value_day": 250000.0,
     "is_repeat_actor": true,
     "is_heavy_actor": true
+  },
+  "whale_profile": {
+    "portfolio_value": 2340000.0,
+    "leaderboard_rank": 45,
+    "leaderboard_profit": 890000.0,
+    "win_rate": 0.73,
+    "positions_count": 12,
+    "markets_traded": 195
+  },
+  "market_context": {
+    "yes_price": 0.65,
+    "no_price": 0.35,
+    "spread": 0.02,
+    "volume_24h": 450000.0,
+    "open_interest": 2100000.0,
+    "price_change_24h": 3.2,
+    "liquidity": 180000.0,
+    "tags": ["crypto", "bitcoin"]
+  },
+  "order_book": {
+    "best_bid": 0.64,
+    "best_ask": 0.66,
+    "bid_depth_10pct": 45000.0,
+    "ask_depth_10pct": 38000.0,
+    "bid_levels": 12,
+    "ask_levels": 9
+  },
+  "top_holders": {
+    "holders": [
+      { "wallet": "0x742d...bEb", "shares": 150000, "value": 97500 }
+    ],
+    "total_shares": 1250000
   }
 }
 ```
 
-### Field Descriptions
+### Key Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `platform` | string | "Polymarket" or "Kalshi" |
-| `alert_type` | string | "WHALE_ENTRY" or "WHALE_EXIT" |
-| `action` | string | "BUY" or "SELL" |
-| `value` | number | Transaction value in USD |
-| `price` | number | Price per contract (0.0-1.0 representing probability) |
-| `size` | number | Number of contracts traded |
-| `timestamp` | string | ISO 8601 timestamp |
-| `market_title` | string | Market question or title |
-| `outcome` | string | Outcome traded (e.g., "Yes", "No", candidate name) |
-| `wallet_id` | string | Wallet address or trader ID |
-| `wallet_activity.transactions_last_hour` | number | Transactions in past hour |
-| `wallet_activity.transactions_last_day` | number | Transactions in past 24 hours |
-| `wallet_activity.total_value_hour` | number | Total USD volume in past hour |
-| `wallet_activity.total_value_day` | number | Total USD volume in past 24 hours |
-| `wallet_activity.is_repeat_actor` | boolean | true if 2+ transactions in 1 hour |
-| `wallet_activity.is_heavy_actor` | boolean | true if 5+ transactions in 24 hours |
+| Field | Description |
+|-------|-------------|
+| `platform` | "Polymarket" or "Kalshi" |
+| `alert_type` | "WHALE_ENTRY" or "WHALE_EXIT" |
+| `action` / `value` / `price` | Trade direction, USD value, contract price |
+| `wallet_activity` | Transaction counts, volume, repeat/heavy actor flags |
+| `whale_profile` | Portfolio value, leaderboard rank, win rate, positions (Polymarket only) |
+| `market_context` | YES/NO odds, spread, volume, open interest, tags |
+| `order_book` | Best bid/ask, depth, level counts |
+| `top_holders` | Top holders with share counts (Polymarket only) |
+
+See [`docs/WEBHOOK_REFERENCE.md`](docs/WEBHOOK_REFERENCE.md) for full field descriptions, n8n templates, and filter examples.
 
 ### Integration Examples
 
@@ -556,39 +582,65 @@ HTTP Request node configuration:
 ```
 [ALERT] LARGE TRANSACTION DETECTED - Polymarket
 ======================================================================
-Market:   Will Trump win the 2024 Presidential Election?
-Outcome:  Yes
-Value:    $45,250.00
-Price:    $0.7500 (75.0%)
-Size:     60333.33 contracts
-Side:     BUY
-Time:     2026-01-08T21:30:00Z
+Question:   Will Bitcoin reach 100k by end of 2026?
+Position:   BUYING 'Yes' shares
+Prediction: Market believes 'Yes' has 65.0% chance
 
-[ANOMALY INDICATORS]
-  - High conviction in likely outcome
+TRANSACTION DETAILS
+Amount:     $50,000.00
+Contracts:  76923.08 @ $0.6500 each
+Action:     BUY shares
+Timestamp:  2026-02-13T18:00:00Z
 
-Asset ID: 65396714035221124737...
+[WALLET ACTIVITY]
+Wallet:   0x742d35...f0bEb
+Txns (1h):  2
+Txns (24h): 5
+Volume (24h): $380,000.00
+Status: HEAVY ACTOR (5+ transactions in 24h)
+
+[MARKET CONTEXT]
+Odds:          YES 65.0% | NO 35.0%
+Spread:        $0.02 (tight)
+24h Volume:    $450,000
+Open Interest: $2,100,000
+Tags:          crypto, bitcoin
+
+[WHALE PROFILE]
+Leaderboard:  #45 (TOP 50)
+Profit:       +$890,000
+Portfolio:    $2,340,000
+Win Rate:     73.0%
+
+[ORDER BOOK]
+Best Bid:   $0.6400  |  Best Ask: $0.6600
+Bid Depth:  $45,000 (12 levels)  |  Ask Depth: $38,000 (9 levels)
+Imbalance:  54% bid / 46% ask
 ======================================================================
 ```
 
 ## AI Agent Integration
 
-wwatcher can be used with AI agents (OpenClaw, Claude Code) for automated research and analysis.
+wwatcher includes an AI integration layer that scores whale alerts, runs context-aware research, and delivers structured signals (bullish/bearish, confidence, key factors).
 
 ### Quick Setup
 
 ```bash
-# Build the integration
 cd integration
 npm install
 npm run build
 
-# Configure RapidAPI (optional, for market data)
-cp .env.example .env
-# Edit .env and add: RAPIDAPI_KEY=your-key
+# Configure API keys
+cat > .env << EOF
+PERPLEXITY_API_KEY=your-key
+RAPIDAPI_KEY=your-key
+EOF
+
+# Test
+node dist/cli.js status
 ```
 
-### OpenClaw CLI
+### CLI Commands
 
 ```bash
 cd integration
@@ -596,29 +648,41 @@ cd integration
 # Health check
 node dist/cli.js status
 
-# Query alerts
+# Query alerts (enriched with whale profile, order book, tags)
 node dist/cli.js alerts --limit=10 --min=50000
-node dist/cli.js alerts --platform=polymarket --type=WHALE_ENTRY
 
-# Get market data
+# Score an alert — returns tier (high/medium/low) + factors
+node dist/cli.js score '<alert_json>'
+
+# Context-aware research — scores alert, targeted queries, structured signal
+node dist/cli.js research "Bitcoin above 100k" --context='<alert_json>'
+
+# Generic research (no alert context)
+node dist/cli.js research "Bitcoin above 100k" --category=crypto
+
+# RapidAPI market data only
 node dist/cli.js fetch "Bitcoin price above 100k"
-node dist/cli.js fetch "Lakers vs Celtics" --category=sports
+
+# Show user preference schema
+node dist/cli.js preferences show
 ```
 
-### Install OpenClaw Skill
+### OpenClaw Skill
 
 ```bash
 mkdir -p ~/.openclaw/skills/wwatcher-ai
 cp integration/skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
 ```
 
-### MCP Server (Claude Code)
+The skill auto-triggers on whale alerts and supports user preferences like "only 60%+ win rate" or "skip under $100k".
+
+### MCP Server
 
 ```bash
 npm run start:mcp
 ```
 
-See [`integration/README.md`](./integration/README.md) for full details.
+See [`integration/README.md`](./integration/README.md) for full details including scoring, structured signals, and prediction market data.
 
 ---
 

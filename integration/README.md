@@ -2,7 +2,11 @@
 
 AI agent integration for wwatcher whale alert monitoring. Includes:
 - **CLI tool** for OpenClaw and shell-based agents
-- **MCP server** for Claude Code and MCP-compatible clients
+- **MCP server** for MCP-compatible clients
+- **Alert scoring** with weighted factors (whale rank, win rate, trade size, order book)
+- **Context-aware research** with structured signals (bullish/bearish, confidence, factors)
+- **Prediction market data** from Polymarket + Kalshi public APIs (no keys needed)
+- **User preferences** for filtering alerts by win rate, rank, platform, category
 - **RapidAPI integration** for contextual market data (crypto, sports, weather, news)
 
 ## Quick Start
@@ -16,19 +20,15 @@ npm run build
 ## Configuration
 
 1. Copy `.env.example` to `.env`
-2. Add your RapidAPI key: `RAPIDAPI_KEY=your-key`
-3. Get your key at https://rapidapi.com
+2. Add your Perplexity key: `PERPLEXITY_API_KEY=your-key` (required for research)
+3. Add your RapidAPI key: `RAPIDAPI_KEY=your-key` (optional, for market data enrichment)
 
-Subscribe to these APIs (free tiers available):
+| Key | Required | Purpose | Get it at |
+|-----|----------|---------|-----------|
+| `PERPLEXITY_API_KEY` | For research | Web-based analysis | [perplexity.ai/settings/api](https://perplexity.ai/settings/api) |
+| `RAPIDAPI_KEY` | Optional | Market data | [rapidapi.com](https://rapidapi.com) |
 
-| Category | API | Link |
-|----------|-----|------|
-| Crypto | Coinranking | [rapidapi.com/Coinranking/api/coinranking1](https://rapidapi.com/Coinranking/api/coinranking1) |
-| Sports | NBA API | [rapidapi.com/api-sports/api/nba-api-free-data](https://rapidapi.com/api-sports/api/nba-api-free-data) |
-| Weather | Meteostat | [rapidapi.com/meteostat/api/meteostat](https://rapidapi.com/meteostat/api/meteostat) |
-| News | Crypto News | [rapidapi.com/Starter-api/api/cryptocurrency-news2](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) |
-
-Your single API key works for all subscribed services.
+Prediction market data (related markets, cross-platform matching) requires **no API keys**.
 
 ---
 
@@ -42,19 +42,34 @@ For OpenClaw agents or any shell-based automation.
 # Health check
 node dist/cli.js status
 
-# Query alerts
+# Query alerts (returns enriched data: whale profile, order book, tags)
 node dist/cli.js alerts --limit=10 --min=50000
 node dist/cli.js alerts --platform=polymarket --type=WHALE_ENTRY
 
-# Aggregate stats
+# Aggregate stats (avg whale rank, avg bid depth)
 node dist/cli.js summary
 
-# Search alerts
+# Search alerts (searches titles, outcomes, and tags)
 node dist/cli.js search "bitcoin"
 
-# Fetch market data from RapidAPI
+# Score an alert — returns tier (high/medium/low) + factors
+node dist/cli.js score '<alert_json>'
+
+# Full research — context-aware with structured signal
+node dist/cli.js research "Bitcoin above 100k" --context='<alert_json>'
+
+# Full research — generic (no alert context)
+node dist/cli.js research "Bitcoin above 100k" --category=crypto
+
+# Fetch RapidAPI market data only
 node dist/cli.js fetch "Bitcoin price above 100k"
 node dist/cli.js fetch "Lakers vs Celtics" --category=sports
+
+# Single Perplexity search
+node dist/cli.js perplexity "What are Bitcoin ETF inflows?"
+
+# Show preference schema
+node dist/cli.js preferences show
 ```
 
 ### CLI Options
@@ -68,10 +83,60 @@ node dist/cli.js fetch "Lakers vs Celtics" --category=sports
 | `--min=N` | Minimum USD value |
 | `--since=ISO` | Alerts after timestamp |
 
+**research:**
+| Option | Description |
+|--------|-------------|
+| `--context=JSON` | Full alert JSON for context-aware research (auto-scores, targeted queries, structured signal) |
+| `--category=X` | Override category: crypto, sports, weather, news, politics |
+| `--queries=N` | Number of Perplexity queries (default: 3 with context, 5 without) |
+
 **fetch:**
 | Option | Description |
 |--------|-------------|
 | `--category=X` | Override: weather, crypto, sports, news |
+
+### Alert Scoring
+
+The `score` command analyzes an alert and returns a tier with factors:
+
+```bash
+node dist/cli.js score '{"platform":"polymarket","action":"BUY","value":150000,...}'
+```
+
+```json
+{
+  "score": 80,
+  "tier": "high",
+  "factors": [
+    "Top 50 leaderboard trader (#45)",
+    "Strong win rate (73%)",
+    "Large portfolio ($2.3M)",
+    "Heavy actor (6 txns/24h)",
+    "Large trade ($150k)"
+  ]
+}
+```
+
+### Context-Aware Research
+
+When `--context` is provided, the research command:
+1. Scores the alert automatically
+2. Generates 3 targeted Perplexity queries based on score factors
+3. Fetches prediction market data (related markets, cross-platform match)
+4. Returns a structured signal:
+
+```json
+{
+  "signal": {
+    "direction": "bullish",
+    "confidence": "high",
+    "factors": ["Top 50 trader (#45)", "Strong win rate (73%)", ...],
+    "whale_quality": "Rank #45, 73% win rate, $2.3M portfolio",
+    "market_pressure": "Bid pressure (64/36 bid/ask)",
+    "research_summary": "Bitcoin ETF inflows hit $500M this week..."
+  }
+}
+```
 
 ### OpenClaw Skill Installation
 
@@ -80,11 +145,17 @@ mkdir -p ~/.openclaw/skills/wwatcher-ai
 cp skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
 ```
 
+The skill supports:
+- Automatic alert parsing and scoring
+- User preferences via OpenClaw memory (`wwatcher_preferences` key)
+- Natural language filter management ("only 60%+ win rate", "skip under $100k")
+- Structured signal delivery
+
 ---
 
-## Option 2: MCP Server (Claude Code)
+## Option 2: MCP Server
 
-For MCP-compatible clients like Claude Code.
+For MCP-compatible clients.
 
 ### Setup
 
@@ -97,6 +168,7 @@ Add to your MCP client config:
       "command": "node",
       "args": ["/absolute/path/to/integration/dist/index.js"],
       "env": {
+        "PERPLEXITY_API_KEY": "your-key",
         "RAPIDAPI_KEY": "your-key"
       }
     }
@@ -116,11 +188,13 @@ node dist/index.js
 
 | Tool | Description |
 |------|-------------|
-| `get_recent_alerts` | Query alert history with filters |
-| `get_alert_summary` | Aggregate stats: volume, top markets, whale counts |
-| `search_alerts` | Text search in market titles/outcomes |
+| `get_recent_alerts` | Query alert history with filters (platform, type, value, tags, win rate, rank) |
+| `get_alert_summary` | Aggregate stats: volume, top markets, whale counts, avg rank, avg bid depth |
+| `search_alerts` | Text search in market titles, outcomes, and tags |
 | `fetch_market_data` | Pull RapidAPI data based on market keywords |
 | `get_wwatcher_status` | Health check |
+
+All alert tools return enriched data: whale profile, order book, top holders, market context, tags.
 
 ### Modes
 
@@ -135,11 +209,12 @@ Providers are organized by category in the `providers/` directory:
 
 ```
 providers/
-├── README.md       # Full documentation for adding providers
-├── crypto.json     # Coinranking (BTC, ETH, SOL prices)
-├── sports.json     # NBA API (games, scores)
-├── weather.json    # Meteostat (forecasts)
-└── news.json       # Cryptocurrency News
+├── README.md                # Full documentation for adding providers
+├── crypto.json              # Coinranking (BTC, ETH, SOL prices)
+├── sports.json              # NBA API (games, scores)
+├── weather.json             # Meteostat (forecasts)
+├── news.json                # Cryptocurrency News
+└── prediction-markets.json  # Polymarket + Kalshi (related markets, cross-platform)
 ```
 
 ### Adding a Provider
@@ -177,7 +252,8 @@ See [`providers/README.md`](./providers/README.md) for the complete schema and e
 ## For AI Agents
 
 See [`instructions_for_ai_agent.md`](../instructions_for_ai_agent.md) for complete agent instructions including:
-- Research workflows
-- Analysis output format
-- Category-specific guidance
+- Scoring system and tier thresholds
+- Context-aware research workflow
+- Structured signal format
+- User preference management
 - Pattern detection

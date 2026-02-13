@@ -273,34 +273,60 @@ Thanks to these contributors for their ideas and improvements:
 
 ## AI Agent Integration
 
-wwatcher includes an AI integration layer that turns whale alerts into actionable research. When you receive a whale alert, the agent investigates using RapidAPI data sources, analyzes the position, and delivers research-backed insights.
+wwatcher includes an AI integration layer that turns whale alerts into actionable research with structured signals. When a whale alert arrives, the agent scores it, runs context-aware research using Perplexity + prediction market data, and delivers a structured signal (bullish/bearish, confidence, key factors).
 
 ### Quick Start
 
 ```bash
-# Build the CLI
 cd integration
 npm install
 npm run build
 
-# Configure your API key
-echo "RAPIDAPI_KEY=your-key-here" > .env
+# Configure API keys
+cat > .env << EOF
+PERPLEXITY_API_KEY=your-key-here
+RAPIDAPI_KEY=your-key-here
+EOF
 
 # Test it works
 node dist/cli.js status
-node dist/cli.js fetch "Bitcoin price above 100k"
+node dist/cli.js preferences show
 ```
 
 ### CLI Commands
 
 ```bash
 node dist/cli.js status                           # Health check
-node dist/cli.js alerts --limit=10 --min=50000    # Query alerts
+node dist/cli.js alerts --limit=10 --min=50000    # Query alerts (enriched data)
 node dist/cli.js summary                          # Aggregate stats
-node dist/cli.js search "bitcoin"                 # Search alerts
-node dist/cli.js fetch "BTC price above 100k"    # Fetch market data
-node dist/cli.js fetch "Lakers game" --category=sports
+node dist/cli.js search "bitcoin"                 # Search alerts by title/tags
+node dist/cli.js score '<alert_json>'             # Score alert → tier + factors
+node dist/cli.js research "BTC above 100k"        # Full research (generic)
+node dist/cli.js research "BTC above 100k" --context='<alert_json>'  # Context-aware research
+node dist/cli.js fetch "BTC price above 100k"     # RapidAPI data only
+node dist/cli.js preferences show                 # Show preference schema
 ```
+
+### Alert Scoring
+
+Every alert is scored based on whale profile, trade size, order book imbalance, and position type:
+
+| Tier | Score | Meaning |
+|------|-------|---------|
+| **High** | >= 60 | Top trader, large bet, strong signals |
+| **Medium** | >= 35 | Known trader or significant trade |
+| **Low** | < 35 | Unknown trader, smaller trade |
+
+### User Preferences (OpenClaw)
+
+Users can set natural language filters that OpenClaw stores in memory:
+
+- "Only alert me on whales with 60%+ win rate"
+- "Skip anything under $100k"
+- "Only crypto and politics markets"
+- "Top 100 leaderboard traders only"
+
+See [`integration/skill/SKILL.md`](./integration/skill/SKILL.md) for the full preference schema.
 
 ### Modular Provider System
 
@@ -308,14 +334,15 @@ Providers are organized by category in `integration/providers/`:
 
 ```
 providers/
-├── crypto.json     # Cryptocurrency APIs (Coinranking)
-├── sports.json     # Sports data (NBA API)
-├── weather.json    # Weather forecasts (Meteostat)
-├── news.json       # News aggregation (Crypto News)
-└── README.md       # How to add more providers
+├── crypto.json              # Coinranking (BTC, ETH, SOL prices)
+├── sports.json              # NBA API (games, scores)
+├── weather.json             # Meteostat (forecasts)
+├── news.json                # Cryptocurrency News
+├── prediction-markets.json  # Polymarket + Kalshi (related markets, cross-platform)
+└── README.md                # How to add more providers
 ```
 
-**Adding new providers**: Create a new JSON file or add to existing category files. See [`integration/providers/README.md`](./integration/providers/README.md) for the full schema and examples.
+Prediction market data (related markets, cross-platform matching, price history) requires **no API keys** — it calls public Polymarket and Kalshi endpoints directly.
 
 ### OpenClaw Skill Installation
 
@@ -324,7 +351,7 @@ mkdir -p ~/.openclaw/skills/wwatcher-ai
 cp integration/skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
 ```
 
-### MCP Server (Claude Code)
+### MCP Server
 
 ```bash
 npm run start:mcp
@@ -342,7 +369,9 @@ Add to your MCP config:
 }
 ```
 
-### RapidAPI Setup
+MCP tools return full enriched data (whale profile, order book, top holders, tags) and support filtering by win rate, leaderboard rank, and tags.
+
+### RapidAPI Setup (Optional)
 
 Your single API key works for all subscribed services. Subscribe to these (free tiers available):
 
@@ -355,8 +384,8 @@ Your single API key works for all subscribed services. Subscribe to these (free 
 
 ### Documentation
 
+- [`integration/skill/SKILL.md`](./integration/skill/SKILL.md) — OpenClaw skill (scoring, preferences, workflow)
 - [`integration/providers/README.md`](./integration/providers/README.md) — Adding custom providers
-- [`integration/skill/SKILL.md`](./integration/skill/SKILL.md) — OpenClaw skill reference
 - [`instructions_for_ai_agent.md`](./instructions_for_ai_agent.md) — Complete agent instructions
 - [`integration/README.md`](./integration/README.md) — CLI and MCP server details
 
