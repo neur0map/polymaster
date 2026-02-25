@@ -16,27 +16,37 @@ Conduct thorough research on a specific market opportunity using Perplexity AI, 
 - `scanner_data`: The scanner's pipeline entry data object
 - `research_id`: UUID for this research run
 
-## API Calls
+## API Calls (ORDER MATTERS)
 
-### Perplexity Research (via polymaster CLI)
+### Step 1: RapidAPI Structured Data (FIRST)
 ```bash
-cd ~/prowl/polymaster/integration
-node dist/cli.js perplexity "<query>"
+cd ~/polymaster/integration
+node dist/cli.js fetch "<market_title>" --category=<category>
 ```
+**RULE**: Always query RapidAPI BEFORE Perplexity. RapidAPI has structured, reliable data. Use it for stats, scores, and historical data.
 
-Run 3-4 targeted queries based on the category context file's research query templates.
-
-### Polymaster Whale Alerts
+### Step 2: Polymaster Whale Alerts (filter by market)
 ```bash
-cd ~/prowl/polymaster/integration
-node dist/cli.js alerts --category=<category> --limit=10
+cd ~/polymaster/integration
+node dist/cli.js alerts --category=<category> --limit=20 | jq '.[] | select(.market_title | test("<team1>|<team2>"; "i"))'
 ```
+**RULE**: Do NOT read entire alerts JSON. Filter by team/market name to avoid token waste.
 
-Check for recent whale activity on related markets.
-
-### Polymaster Context-Aware Research (if whale data exists)
+### Step 3: Perplexity Research (GAP-FILLING ONLY)
 ```bash
-cd ~/prowl/polymaster/integration
+cd ~/polymaster/integration
+node dist/cli.js perplexity "<targeted query>"
+```
+**RULE**: Use Perplexity only for:
+- Breaking news not in structured data
+- Red flags found in RapidAPI data that need investigation
+- Injury updates, weather, coaching changes
+
+Do NOT use Perplexity as primary research source. It's slower and less structured than RapidAPI.
+
+### Step 4: Context-Aware Research (if whale data exists)
+```bash
+cd ~/polymaster/integration
 node dist/cli.js research "<market_title>" --category=<category>
 ```
 

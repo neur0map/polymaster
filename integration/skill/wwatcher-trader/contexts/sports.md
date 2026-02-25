@@ -40,13 +40,53 @@ Specialized research guidance for sports prediction markets on Kalshi. Load this
 
 ## Polymaster Integration
 
-Sports whale alerts track big money on Polymarket:
+### Whale Alerts (filter by game name)
+**RULE**: Do NOT read entire alerts JSON. Filter by game/team name:
 ```bash
-cd ~/prowl/polymaster/integration
-node dist/cli.js alerts --category=sports --limit=10
+cd ~/polymaster/integration
+node dist/cli.js alerts --category=sports --limit=20 | jq '.[] | select(.market_title | test("Nevada|New Mexico"; "i"))'
 ```
+Replace team names with the actual teams in your market. This avoids token waste on irrelevant alerts.
 
 Sports markets attract sophisticated bettors. Whale entries from high win-rate accounts are particularly meaningful in sports where edge detection is well-established.
+
+## RapidAPI Sports Data (MANDATORY)
+
+**RULE**: Always query RapidAPI sports providers BEFORE Perplexity. RapidAPI has structured data; Perplexity is for filling gaps.
+
+### Step 1: Get Team Stats via RapidAPI
+```bash
+cd ~/polymaster/integration
+node dist/cli.js fetch "{team1} vs {team2}" --category=sports
+```
+
+### Step 2: Check Recent Form (Last 5-10 Games)
+Look for:
+- **Team scoring average** last 5 games
+- **Key player PPG/stats** recent games
+- **Win/loss streak**
+- **Home vs away splits**
+
+### Step 3: Red Flag Detection
+If RapidAPI data shows any of these red flags, run targeted Perplexity search:
+- Star player missing from recent box scores → search `"{player} injury status {date}"`
+- Scoring average dropped significantly → search `"{team} recent struggles {month} {year}"`
+- Unusual line movement → search `"{game} sharp money line movement"`
+- Back-to-back or 3-in-4 nights → search `"{team} schedule fatigue"`
+
+### Step 4: Perplexity (Gap-Filling Only)
+Use Perplexity for:
+- Breaking news not in structured data
+- Injury updates closer to game time
+- Weather for outdoor games
+- Coaching/roster changes
+
+```bash
+cd ~/polymaster/integration
+node dist/cli.js perplexity "{targeted query based on red flags}"
+```
+
+**DO NOT** use Perplexity as primary research. It's slower and less reliable than RapidAPI for box scores and stats.
 
 ## Confidence Adjustments
 
