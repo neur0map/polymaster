@@ -6,6 +6,39 @@
 
 ---
 
+## ⚠️ Pre-Flight Checklist (MANDATORY)
+
+**Before executing ANY part of this skill, verify:**
+
+```
+[ ] Read this SKILL.md completely (not just skimmed)
+[ ] Read agents/researcher.md — this is the FULL researcher prompt
+[ ] Read agents/orderbook.md — this is the FULL orderbook prompt
+[ ] Read agents/risk.md — this is the FULL risk check prompt
+[ ] Read agents/decision.md — this is the FULL decision prompt
+[ ] Read contexts/{category}.md for the relevant category
+[ ] Verified API keys exist: ~/.openclaw/credentials/perplexity.json, rapidapi.json
+[ ] Verified Kalshi credentials: ~/.kalshi/private_key.pem
+```
+
+**When spawning sub-agents:**
+- **DO**: Read the agent prompt file and pass its FULL contents to the sub-agent
+- **DO**: Include the relevant context file (contexts/sports.md, etc.)
+- **DON'T**: Paraphrase or summarize the prompts
+- **DON'T**: Substitute web search for the documented CLI tools
+- **DON'T**: Skip steps because "it's faster"
+
+**Required CLI tools (in order):**
+1. `node dist/cli.js fetch` — RapidAPI structured data (FIRST)
+2. `node dist/cli.js alerts` — Whale signals
+3. `node dist/cli.js perplexity` — Gap-filling research (NOT primary)
+4. `x search` — Twitter sentiment
+5. `engage reddit search` — Reddit sentiment
+
+**If you skip steps, log to:** `~/.openclaw/memory/wwatcher_trading/skill-failures.jsonl`
+
+---
+
 ## Trigger
 
 ### On Install
