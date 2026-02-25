@@ -15,4 +15,8 @@ Cargo.lock
 
 # Config (contains API keys)
 config.json
+!integration/skill/wwatcher-trader/templates/config.json
 /integration/node_modules
+
+# Prowl snapshot cache
+.prowl/

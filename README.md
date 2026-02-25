@@ -347,9 +347,92 @@ Prediction market data (related markets, cross-platform matching, price history)
 ### OpenClaw Skill Installation
 
 ```bash
+# Research & alerting skill
 mkdir -p ~/.openclaw/skills/wwatcher-ai
 cp integration/skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
 ```
+
+## Autonomous Trading (wwatcher-trader)
+
+An OpenClaw skill that turns whale intelligence into autonomous trades on Kalshi prediction markets. The system scans for mispriced opportunities, researches with AI, validates risk, executes trades, monitors positions, and learns from losses.
+
+### Architecture
+
+9 specialized agents orchestrated by a master SKILL.md, communicating through shared JSONL files:
+
+```
+Scanner → Researcher + Orderbook (parallel) → Risk Manager → Decision Maker → Executor
+                                                                                  ↓
+                                                              Monitor ←→ Portfolio Tracker
+                                                                                  ↓
+                                                                            Post-Mortem
+```
+
+| Agent | Purpose |
+|-------|---------|
+| **Scanner** | Scans Kalshi public markets, filters by category/volume/multiplier/spread |
+| **Researcher** | Perplexity AI + polymaster whale data + category-specific context |
+| **Orderbook** | Liquidity, spread, depth, and slippage analysis |
+| **Risk** | Enforces daily limits, position caps, correlated exposure, losing streak rules |
+| **Decision** | Weighs all agent verdicts, determines EXECUTE / QUEUE / SKIP |
+| **Executor** | RSA-PSS signed Kalshi API calls, limit order placement |
+| **Monitor** | Checks stop-loss, take-profit, and expiry thresholds |
+| **Portfolio** | Recalculates balances, win rate, P&L from trade log |
+| **Post-mortem** | Analyzes losses, writes improvement rules all agents read |
+
+### Safety
+
+- **Dry-run by default** — no real trades until you say "enable live trading"
+- **Limit orders only** — never market orders
+- **Daily spending cap** — default $200/day
+- **Position cap** — default 3 concurrent positions
+- **Losing streak protection** — auto-reduces trade size after 3 consecutive losses
+- **Private key isolation** — PEM file path in config, key never enters JSON or LLM context
+- **Payout multiplier filter** — only trades where you can nearly 2x your money (default 1.8x minimum)
+
+### Category Contexts
+
+Specialized research guidance loaded per market type:
+
+| Category | Key Focus |
+|----------|-----------|
+| **Crypto** | Funding rates, on-chain flows, macro calendar, ETF data |
+| **Weather** | Multi-model agreement, temperature margins, precipitation type |
+| **Politics** | Polling averages, demographics, methodology checks |
+| **Sports** | Injury reports, line movement, sharp money, rest days |
+
+### Self-Learning
+
+The post-mortem agent analyzes every losing trade:
+1. Reconstructs the full decision trail from pipeline data
+2. Runs fresh research on what actually happened
+3. Identifies root cause and missed factors
+4. Writes an improvement rule (e.g., "REQUIRE 2+ weather model agreement")
+5. Regenerates `improvements.md` — a rulebook every agent reads before acting
+
+### Installation
+
+```bash
+# Symlink is created automatically, or manually:
+ln -s ~/prowl/polymaster/integration/skill/wwatcher-trader ~/.openclaw/skills/wwatcher-trader
+```
+
+On first run, the skill walks you through setup: Kalshi API credentials, category selection, risk limits, and a verification call.
+
+### User Commands
+
+```
+"show my portfolio"          → balances, open positions, all-time stats
+"what's pending"             → trades awaiting your approval
+"approve trade_004"          → execute a queued trade
+"pause trading"              → stop scanning, keep monitoring positions
+"enable live trading"        → switch from dry-run to real trades
+"raise my daily limit to $500" → update risk limits
+"show my lessons"            → view improvement rules from past losses
+"kill all positions"         → emergency exit all positions
+```
+
+See [`integration/skill/wwatcher-trader/SKILL.md`](./integration/skill/wwatcher-trader/SKILL.md) for the full orchestration spec and [`docs/plans/2026-02-24-autonomous-trading-design.md`](./docs/plans/2026-02-24-autonomous-trading-design.md) for the design document.
 
 ### MCP Server
 
