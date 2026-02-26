@@ -393,10 +393,7 @@ All API behavior is controlled via `~/.config/wwatcher/config.json` (or `wwatche
   "history_retention_days": 30,
   "kalshi_api_key_id": null,
   "kalshi_private_key": null,
-  "webhook_url": "https://your-n8n-instance/webhook/xxx",
-  "rapidapi_key": null,
-  "perplexity_api_key": null,
-  "ai_agent_mode": false
+  "webhook_url": "https://your-n8n-instance/webhook/xxx"
 }
 ```
 
@@ -409,6 +406,3 @@ All API behavior is controlled via `~/.config/wwatcher/config.json` (or `wwatche
 | `kalshi_api_key_id` | `null` | Optional Kalshi API key for enhanced access |
 | `kalshi_private_key` | `null` | Optional Kalshi private key |
 | `webhook_url` | `null` | Webhook URL for external notifications |
-| `rapidapi_key` | `null` | Optional RapidAPI key for AI agent |
-| `perplexity_api_key` | `null` | Optional Perplexity key for AI agent |
-| `ai_agent_mode` | `false` | Enable AI agent integration |

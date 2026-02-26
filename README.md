@@ -42,7 +42,7 @@ This tool is for informational and research purposes only. Use this data solely 
 ### Integrations
 - **Webhook notifications** to n8n, Zapier, Make, Discord, or any endpoint
 - Rich JSON payload with market context, whale profile, order book, and top holders
-- **AI agent integration** with RapidAPI and Perplexity for deep market research
+- **Scoring MCP server** for alert scoring and preference filtering
 
 ### Infrastructure
 - SQLite database for alert history and wallet memory
@@ -193,8 +193,7 @@ Run `wwatcher setup` for a guided 6-step wizard that configures:
 2. **Categories** — Sports, Crypto, Politics, Economics, etc. with subcategory drill-down
 3. **Threshold & Retention** — Minimum trade size and history retention period
 4. **API Keys** — Optional Kalshi credentials
-5. **AI Agent Mode** — Optional RapidAPI + Perplexity keys
-6. **Save & Summary**
+5. **Save & Summary**
 
 ### Documentation
 
@@ -271,206 +270,55 @@ Thanks to these contributors for their ideas and improvements:
 
 - [@fuzmik](https://github.com/fuzmik) - Suggested alert history logging feature
 
-## AI Agent Integration
+## Integration (MCP)
 
-wwatcher includes an AI integration layer that turns whale alerts into actionable research with structured signals. When a whale alert arrives, the agent scores it, runs context-aware research using Perplexity + prediction market data, and delivers a structured signal (bullish/bearish, confidence, key factors).
+wwatcher includes a scoring MCP server with two tools: `score_alert` and `check_preferences`. No API keys required.
 
-### Quick Start
+See [`integration/README.md`](./integration/README.md) for setup and tool details.
 
-```bash
-cd integration
-npm install
-npm run build
+## Prowl Bot (Planned)
 
-# Configure API keys
-cat > .env << EOF
-PERPLEXITY_API_KEY=your-key-here
-RAPIDAPI_KEY=your-key-here
-EOF
+A conversational Telegram bot with a multi-agent prediction market team. The bot talks to you, analyzes whale alerts, and can place trades on Kalshi and Polymarket after your approval.
 
-# Test it works
-node dist/cli.js status
-node dist/cli.js preferences show
-```
-
-### CLI Commands
-
-```bash
-node dist/cli.js status                           # Health check
-node dist/cli.js alerts --limit=10 --min=50000    # Query alerts (enriched data)
-node dist/cli.js summary                          # Aggregate stats
-node dist/cli.js search "bitcoin"                 # Search alerts by title/tags
-node dist/cli.js score '<alert_json>'             # Score alert → tier + factors
-node dist/cli.js research "BTC above 100k"        # Full research (generic)
-node dist/cli.js research "BTC above 100k" --context='<alert_json>'  # Context-aware research
-node dist/cli.js fetch "BTC price above 100k"     # RapidAPI data only
-node dist/cli.js preferences show                 # Show preference schema
-```
-
-### Alert Scoring
-
-Every alert is scored based on whale profile, trade size, order book imbalance, and position type:
-
-| Tier | Score | Meaning |
-|------|-------|---------|
-| **High** | >= 60 | Top trader, large bet, strong signals |
-| **Medium** | >= 35 | Known trader or significant trade |
-| **Low** | < 35 | Unknown trader, smaller trade |
-
-### User Preferences (OpenClaw)
-
-Users can set natural language filters that OpenClaw stores in memory:
-
-- "Only alert me on whales with 60%+ win rate"
-- "Skip anything under $100k"
-- "Only crypto and politics markets"
-- "Top 100 leaderboard traders only"
-
-See [`integration/skill/SKILL.md`](./integration/skill/SKILL.md) for the full preference schema.
-
-### Modular Provider System
-
-Providers are organized by category in `integration/providers/`:
-
-```
-providers/
-├── crypto.json              # Coinranking (BTC, ETH, SOL prices)
-├── sports.json              # NBA API (games, scores)
-├── weather.json             # Meteostat (forecasts)
-├── news.json                # Cryptocurrency News
-├── prediction-markets.json  # Polymarket + Kalshi (related markets, cross-platform)
-└── README.md                # How to add more providers
-```
-
-Prediction market data (related markets, cross-platform matching, price history) requires **no API keys** — it calls public Polymarket and Kalshi endpoints directly.
-
-### OpenClaw Skill Installation
-
-```bash
-# Research & alerting skill
-mkdir -p ~/.openclaw/skills/wwatcher-ai
-cp integration/skill/SKILL.md ~/.openclaw/skills/wwatcher-ai/SKILL.md
-```
-
-## Autonomous Trading (wwatcher-trader)
-
-An OpenClaw skill that turns whale intelligence into autonomous trades on Kalshi prediction markets. The system scans for mispriced opportunities, researches with AI, validates risk, executes trades, monitors positions, and learns from losses.
+See [`docs/plans/2026-02-25-prowl-bot-design.md`](./docs/plans/2026-02-25-prowl-bot-design.md) for the full design document.
 
 ### Architecture
 
-9 specialized agents orchestrated by a master SKILL.md, communicating through shared JSONL files:
-
 ```
-Scanner → Researcher + Orderbook (parallel) → Risk Manager → Decision Maker → Executor
-                                                                                  ↓
-                                                              Monitor ←→ Portfolio Tracker
-                                                                                  ↓
-                                                                            Post-Mortem
-```
-
-| Agent | Purpose |
-|-------|---------|
-| **Scanner** | Scans Kalshi public markets, filters by category/volume/multiplier/spread |
-| **Researcher** | Perplexity AI + polymaster whale data + category-specific context |
-| **Orderbook** | Liquidity, spread, depth, and slippage analysis |
-| **Risk** | Enforces daily limits, position caps, correlated exposure, losing streak rules |
-| **Decision** | Weighs all agent verdicts, determines EXECUTE / QUEUE / SKIP |
-| **Executor** | RSA-PSS signed Kalshi API calls, limit order placement |
-| **Monitor** | Checks stop-loss, take-profit, and expiry thresholds |
-| **Portfolio** | Recalculates balances, win rate, P&L from trade log |
-| **Post-mortem** | Analyzes losses, writes improvement rules all agents read |
-
-### Safety
-
-- **Dry-run by default** — no real trades until you say "enable live trading"
-- **Limit orders only** — never market orders
-- **Daily spending cap** — default $200/day
-- **Position cap** — default 3 concurrent positions
-- **Losing streak protection** — auto-reduces trade size after 3 consecutive losses
-- **Private key isolation** — PEM file path in config, key never enters JSON or LLM context
-- **Payout multiplier filter** — only trades where you can nearly 2x your money (default 1.8x minimum)
-
-### Category Contexts
-
-Specialized research guidance loaded per market type:
-
-| Category | Key Focus |
-|----------|-----------|
-| **Crypto** | Funding rates, on-chain flows, macro calendar, ETF data |
-| **Weather** | Multi-model agreement, temperature margins, precipitation type |
-| **Politics** | Polling averages, demographics, methodology checks |
-| **Sports** | Injury reports, line movement, sharp money, rest days |
-
-### Self-Learning
-
-The post-mortem agent analyzes every losing trade:
-1. Reconstructs the full decision trail from pipeline data
-2. Runs fresh research on what actually happened
-3. Identifies root cause and missed factors
-4. Writes an improvement rule (e.g., "REQUIRE 2+ weather model agreement")
-5. Regenerates `improvements.md` — a rulebook every agent reads before acting
-
-### Installation
-
-```bash
-# Symlink is created automatically, or manually:
-ln -s ~/prowl/polymaster/integration/skill/wwatcher-trader ~/.openclaw/skills/wwatcher-trader
+You (CEO) ←→ Telegram ←→ Manager Bot
+                              │
+                    ┌─────────┼─────────┐
+                    ▼         ▼         ▼
+                Researcher  Analyst    Risk
+                    └─────────┼─────────┘
+                              ▼
+                      Decision + Approval
+                              ▼
+                    Executor (Kalshi + Polymarket)
 ```
 
-On first run, the skill walks you through setup: Kalshi API credentials, category selection, risk limits, and a verification call.
+- **Manager** — conversational AI with personality (soul.md), persistent memory, and skills. Delegates to team.
+- **Researcher** — gathers market data, news, sentiment (ONNX)
+- **Analyst** — reads wwatcher whale history, scores alerts, detects patterns
+- **Risk** — evaluates position sizing, bankroll management
+- **Executor** — places trades after your approval
 
-### User Commands
+Each agent has its own soul (personality), skills (instructions), and memory (SQLite partition). Cloud LLMs for reasoning (OpenRouter), local models for cheap tasks (Ollama), ONNX for ML (sentiment, reranking, time series).
 
-```
-"show my portfolio"          → balances, open positions, all-time stats
-"what's pending"             → trades awaiting your approval
-"approve trade_004"          → execute a queued trade
-"pause trading"              → stop scanning, keep monitoring positions
-"enable live trading"        → switch from dry-run to real trades
-"raise my daily limit to $500" → update risk limits
-"show my lessons"            → view improvement rules from past losses
-"kill all positions"         → emergency exit all positions
-```
+### Roadmap
 
-See [`integration/skill/wwatcher-trader/SKILL.md`](./integration/skill/wwatcher-trader/SKILL.md) for the full orchestration spec and [`docs/plans/2026-02-24-autonomous-trading-design.md`](./docs/plans/2026-02-24-autonomous-trading-design.md) for the design document.
+| Phase | Description | Status |
+|-------|-------------|--------|
+| **Phase 1** | Talking bot — Telegram, personality, memory, data collection | Planned |
+| **Phase 2** | Team spawning — multi-agent delegation, whale analysis | Planned |
+| **Phase 3** | Alert pipeline — wwatcher webhook triggers auto-analysis | Planned |
+| **Phase 4** | Execution — Kalshi + Polymarket order placement | Planned |
+| **Phase 5** | ML models — ONNX sentiment, reranker, time series | Planned |
+| **Phase 6** | Continual learning — Self-SFT + GRPO on resolved market outcomes | Planned |
 
-### MCP Server
+### Continual Learning
 
-```bash
-npm run start:mcp
-```
-
-Add to your MCP config:
-```json
-{
-  "mcpServers": {
-    "wwatcher": {
-      "command": "node",
-      "args": ["/path/to/integration/dist/index.js"]
-    }
-  }
-}
-```
-
-MCP tools return full enriched data (whale profile, order book, top holders, tags) and support filtering by win rate, leaderboard rank, and tags.
-
-### RapidAPI Setup (Optional)
-
-Your single API key works for all subscribed services. Subscribe to these (free tiers available):
-
-| Category | API | Link |
-|----------|-----|------|
-| Crypto | Coinranking | [rapidapi.com/Coinranking/api/coinranking1](https://rapidapi.com/Coinranking/api/coinranking1) |
-| Sports | NBA API | [rapidapi.com/api-sports/api/nba-api-free-data](https://rapidapi.com/api-sports/api/nba-api-free-data) |
-| Weather | Meteostat | [rapidapi.com/meteostat/api/meteostat](https://rapidapi.com/meteostat/api/meteostat) |
-| News | Crypto News | [rapidapi.com/Starter-api/api/cryptocurrency-news2](https://rapidapi.com/Starter-api/api/cryptocurrency-news2) |
-
-### Documentation
-
-- [`integration/skill/SKILL.md`](./integration/skill/SKILL.md) — OpenClaw skill (scoring, preferences, workflow)
-- [`integration/providers/README.md`](./integration/providers/README.md) — Adding custom providers
-- [`instructions_for_ai_agent.md`](./instructions_for_ai_agent.md) — Complete agent instructions
-- [`integration/README.md`](./integration/README.md) — CLI and MCP server details
+The bot collects predictions from day one. When markets resolve, it builds training data automatically. Fine-tune a local 7B model (MLX on Mac, free) that gets better at your specific markets over time. Based on [Turtel et al. 2025](https://arxiv.org/abs/2505.17989) — same approach that matched o1 accuracy on Polymarket with a 14B model.
 
 ## License
 

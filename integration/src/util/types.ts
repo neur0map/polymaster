@@ -71,65 +71,6 @@ export interface TopHolder {
   value: number;
 }
 
-/** Provider definitions loaded from providers.json */
-export interface ProviderParam {
-  type: "string" | "number";
-  required: boolean;
-  description: string;
-  default?: string | number;
-}
-
-export interface ProviderEndpoint {
-  method: "GET" | "POST";
-  path: string;
-  description: string;
-  params: Record<string, ProviderParam>;
-}
-
-export interface Provider {
-  name: string;
-  category: string;
-  rapidapi_host: string;
-  env_key: string;
-  keywords: string[];
-  match_all?: boolean;
-  endpoints: Record<string, ProviderEndpoint>;
-}
-
-export type ProvidersConfig = Record<string, Provider>;
-
-/** wwatcher config.json schema (from src/config.rs) */
-export interface WwatcherConfig {
-  kalshi_api_key_id?: string;
-  kalshi_private_key?: string;
-  webhook_url?: string;
-}
-
-/** Alert query filters */
-export interface AlertFilter {
-  limit?: number;
-  platform?: string;
-  alert_type?: string;
-  min_value?: number;
-  since?: string;
-  tags?: string[];
-  min_win_rate?: number;
-  max_leaderboard_rank?: number;
-}
-
-/** Alert summary stats */
-export interface AlertSummary {
-  total_alerts: number;
-  total_volume: number;
-  by_platform: Record<string, number>;
-  by_action: Record<string, number>;
-  top_markets: Array<{ title: string; count: number; volume: number }>;
-  whale_count: { repeat_actors: number; heavy_actors: number };
-  avg_whale_rank: number | null;
-  avg_bid_depth: number | null;
-  latest_alert_time: string | null;
-}
-
 /** Alert scoring types */
 export interface AlertScore {
   score: number;
@@ -137,17 +78,7 @@ export interface AlertScore {
   factors: string[];
 }
 
-/** Structured research signal output */
-export interface ResearchSignal {
-  direction: "bullish" | "bearish" | "neutral";
-  confidence: "high" | "medium" | "low";
-  factors: string[];
-  whale_quality: string;
-  market_pressure: string;
-  research_summary: string;
-}
-
-/** User-defined alert preferences (stored in OpenClaw memory) */
+/** User-defined alert preferences */
 export interface AlertPreferences {
   min_value?: number;
   min_win_rate?: number;

@@ -33,7 +33,7 @@ fn print_step(step: u8, total: u8, title: &str) {
 }
 
 pub async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
-    let total_steps = 6;
+    let total_steps = 5;
 
     println!(
         "{}",
@@ -312,106 +312,14 @@ pub async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STEP 5: AI AGENT MODE
+    // STEP 5: SAVE + SUMMARY
     // ═══════════════════════════════════════════════════════════════════════
-    print_step(5, total_steps, "AI AGENT MODE (optional)");
-    println!("Use wwatcher with an AI agent (OpenClaw, Claude Code)?");
-    println!(
-        "If enabled, RapidAPI and Perplexity keys are {} (enhance research).",
-        "optional".bright_yellow()
-    );
-    println!();
-
-    let ai_current = if existing.ai_agent_mode { "enabled" } else { "disabled" };
-    print!(
-        "Enable AI Agent mode? ({}, y/N): ",
-        ai_current.bright_green()
-    );
-    let ai_input = read_line();
-    let ai_agent_mode = if ai_input.is_empty() {
-        existing.ai_agent_mode
-    } else {
-        ai_input.to_lowercase() == "y" || ai_input.to_lowercase() == "yes"
-    };
-
-    if ai_agent_mode {
-        println!("{}", "AI Agent mode enabled".bright_green());
-    } else {
-        println!("AI Agent mode disabled");
-    }
-
-    // RapidAPI (always optional now)
-    let rapidapi_key = if ai_agent_mode {
-        println!();
-        println!("{}", "RapidAPI Key (optional)".bright_white().bold());
-        println!("Provides market data for AI research (crypto, sports, weather).");
-        println!(
-            "Get key at: {}",
-            "https://rapidapi.com".bright_blue()
-        );
-
-        let rapid_current = if existing.rapidapi_key.is_some() {
-            "configured"
-        } else {
-            "not set"
-        };
-        print!(
-            "RapidAPI Key ({}, Enter to keep): ",
-            rapid_current.bright_green()
-        );
-        let key = read_line();
-        if key.is_empty() {
-            existing.rapidapi_key.clone()
-        } else {
-            println!("{}", "RapidAPI key set".bright_green());
-            Some(key)
-        }
-    } else {
-        existing.rapidapi_key.clone()
-    };
-
-    // Perplexity (always optional now)
-    let perplexity_api_key = if ai_agent_mode {
-        println!();
-        println!("{}", "Perplexity API Key (optional)".bright_white().bold());
-        println!("Provides deep web research for market analysis.");
-        println!(
-            "Get key at: {}",
-            "https://perplexity.ai/settings/api".bright_blue()
-        );
-
-        let perp_current = if existing.perplexity_api_key.is_some() {
-            "configured"
-        } else {
-            "not set"
-        };
-        print!(
-            "Perplexity Key ({}, Enter to keep): ",
-            perp_current.bright_green()
-        );
-        let key = read_line();
-        if key.is_empty() {
-            existing.perplexity_api_key.clone()
-        } else {
-            println!("{}", "Perplexity key set".bright_green());
-            Some(key)
-        }
-    } else {
-        existing.perplexity_api_key.clone()
-    };
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // STEP 6: SAVE + SUMMARY
-    // ═══════════════════════════════════════════════════════════════════════
-    print_step(6, total_steps, "SAVE CONFIGURATION");
+    print_step(5, total_steps, "SAVE CONFIGURATION");
 
     let config = crate::config::Config {
         kalshi_api_key_id,
         kalshi_private_key,
         webhook_url,
-        rapidapi_key: rapidapi_key.clone(),
-        perplexity_api_key: perplexity_api_key.clone(),
-        ai_agent_mode,
         categories: categories.clone(),
         threshold,
         platforms: platforms.clone(),
@@ -421,16 +329,6 @@ pub async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     crate::config::save_config(&config)?;
-
-    // Also write to integration/.env if AI mode enabled
-    if ai_agent_mode {
-        if let Err(e) = crate::config::write_integration_env(&rapidapi_key, &perplexity_api_key) {
-            println!(
-                "{}",
-                format!("Note: Could not write integration/.env: {}", e).bright_yellow()
-            );
-        }
-    }
 
     println!(
         "{}",
@@ -499,32 +397,6 @@ pub async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
             "Skipped".dimmed()
         }
     );
-    println!(
-        "  AI Agent Mode: {}",
-        if config.ai_agent_mode {
-            "Enabled".bright_green()
-        } else {
-            "Disabled".dimmed()
-        }
-    );
-    if ai_agent_mode {
-        println!(
-            "  RapidAPI:      {}",
-            if config.rapidapi_key.is_some() {
-                "Configured".bright_green()
-            } else {
-                "Skipped".dimmed()
-            }
-        );
-        println!(
-            "  Perplexity:    {}",
-            if config.perplexity_api_key.is_some() {
-                "Configured".bright_green()
-            } else {
-                "Skipped".dimmed()
-            }
-        );
-    }
     println!();
 
     println!(
@@ -535,14 +407,6 @@ pub async fn setup_config() -> Result<(), Box<dyn std::error::Error>> {
         "Or override threshold: {}",
         "wwatcher watch --threshold 50000".bright_cyan()
     );
-
-    if ai_agent_mode {
-        println!();
-        println!("{}", "AI Agent Setup:".bright_white().bold());
-        println!("  1. Build the CLI: cd integration && npm install && npm run build");
-        println!("  2. Test: node dist/cli.js status");
-        println!("  3. Research: node dist/cli.js research \"Bitcoin above 100k\"");
-    }
 
     Ok(())
 }

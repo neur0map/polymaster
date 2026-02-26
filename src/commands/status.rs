@@ -30,14 +30,6 @@ pub async fn show_status(conn: &Connection) -> Result<(), Box<dyn std::error::Er
                     "Not configured".yellow()
                 }
             );
-            println!(
-                "  AI Agent Mode: {}",
-                if cfg.ai_agent_mode {
-                    "Enabled".green()
-                } else {
-                    "Disabled".yellow()
-                }
-            );
             let cat_display = if cfg.categories.is_empty() || cfg.categories.iter().any(|s| s == "all") {
                 "All markets".to_string()
             } else {
