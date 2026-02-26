@@ -1,5 +1,8 @@
 # Whale Watcher
 
+
+NOTE: repo is transitioning to a full featured trading bot, openclaw like agent that you talk in your telegram with power yo deploy a team of agents to perform research before making a decision.
+
 A Rust CLI tool that monitors large transactions on Polymarket and Kalshi prediction markets. Real-time alerts for significant market activity with built-in anomaly detection.
 
 Repository: https://github.com/neur0map/polymaster
