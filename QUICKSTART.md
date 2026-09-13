@@ -25,43 +25,40 @@ cargo install --path .
 Start monitoring with default settings (monitors transactions over $25k, checks every 5 seconds):
 
 ```bash
-wwatcher watch
+poly watch
 ```
 
 Customize threshold and polling interval:
 
 ```bash
-wwatcher watch --threshold 50000 --interval 30
+poly watch --threshold 50000 --interval 30
 ```
 
 View alert history:
 
 ```bash
-wwatcher history                              # Last 20 alerts
-wwatcher history --limit 50                   # Last 50 alerts
-wwatcher history --platform polymarket        # Polymarket only
-wwatcher history --json                       # Export as JSON
+poly history                              # Last 20 alerts
+poly history --limit 50                   # Last 50 alerts
+poly history --platform polymarket        # Polymarket only
+poly history --json                       # Export as JSON
 ```
 
 ## Running as a System Service (Linux)
 
 To run the watcher continuously as a background service:
 
-### Step 1: Configure webhook (optional)
+### Step 1: Configure poly (optional)
 
 ```bash
-mkdir -p ~/.config/wwatcher
-cat > ~/.config/wwatcher/config.json << 'EOF'
-{
-  "webhook_url": "https://your-webhook-url.com/webhook/polymaster"
-}
-EOF
+poly setup
 ```
+
+The config is read once at startup. After changing it, restart the service (`sudo systemctl restart poly.service`).
 
 ### Step 2: Create systemd service file
 
 ```bash
-sudo tee /etc/systemd/system/wwatcher.service > /dev/null << EOF
+sudo tee /etc/systemd/system/poly.service > /dev/null << EOF
 [Unit]
 Description=Polymaster Whale Watcher
 After=network-online.target
@@ -71,7 +68,7 @@ Wants=network-online.target
 Type=simple
 User=$USER
 WorkingDirectory=$HOME
-ExecStart=$HOME/.cargo/bin/wwatcher watch --threshold 28000 --interval 5
+ExecStart=$HOME/.cargo/bin/poly watch
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -86,60 +83,60 @@ EOF
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable wwatcher.service
-sudo systemctl start wwatcher.service
+sudo systemctl enable poly.service
+sudo systemctl start poly.service
 ```
 
 ### Service Management Commands
 
 ```bash
 # Check service status
-sudo systemctl status wwatcher.service
+sudo systemctl status poly.service
 
 # View live logs
-sudo journalctl -u wwatcher.service -f
+sudo journalctl -u poly.service -f
 
 # Restart service
-sudo systemctl restart wwatcher.service
+sudo systemctl restart poly.service
 
 # Stop service
-sudo systemctl stop wwatcher.service
+sudo systemctl stop poly.service
 ```
 
 ### Quick Update and Restart
 
 ```bash
-cd ~/polymaster && git pull && cargo build --release && cargo install --path . && sudo systemctl restart wwatcher.service
+cd ~/polymaster && git pull && cargo build --release && cargo install --path . && sudo systemctl restart poly.service
 ```
 
 ## Command Reference
 
-### wwatcher watch
+### poly watch
 
 Start monitoring for large transactions.
 
 ```bash
-wwatcher watch [OPTIONS]
+poly watch [OPTIONS]
 ```
 
 Options:
-- `-t, --threshold <AMOUNT>` - Minimum transaction size in USD (default: 25000)
-- `-i, --interval <SECONDS>` - Polling interval in seconds (default: 5)
+- `-t, --threshold <AMOUNT>` - Minimum transaction size in USD (overrides config; default: 25000)
+- `-i, --interval <SECONDS>` - Polling interval in seconds (overrides config; default: 5)
 
 Examples:
 ```bash
-wwatcher watch                        # Default: $25k threshold, 5s interval
-wwatcher watch -t 50000               # $50k threshold
-wwatcher watch -i 30                  # Check every 30 seconds
-wwatcher watch -t 100000 -i 60        # $100k threshold, check every minute
+poly watch                        # Default: $25k threshold, 5s interval
+poly watch -t 50000               # $50k threshold
+poly watch -i 30                  # Check every 30 seconds
+poly watch -t 100000 -i 60        # $100k threshold, check every minute
 ```
 
-### wwatcher history
+### poly history
 
 View saved alert history.
 
 ```bash
-wwatcher history [OPTIONS]
+poly history [OPTIONS]
 ```
 
 Options:
@@ -149,28 +146,29 @@ Options:
 
 Examples:
 ```bash
-wwatcher history                              # Show last 20 alerts
-wwatcher history --limit 50                   # Show last 50 alerts
-wwatcher history --platform polymarket        # Show only Polymarket alerts
-wwatcher history --json                       # Export as JSON
+poly history                              # Show last 20 alerts
+poly history --limit 50                   # Show last 50 alerts
+poly history --platform polymarket        # Show only Polymarket alerts
+poly history --json                       # Export as JSON
 ```
 
-Alerts are automatically saved to `~/.config/wwatcher/alert_history.jsonl`.
+Alerts are automatically saved to `~/.config/poly/poly.db` (SQLite). Browse with `poly history` or export with `--json`.
 
-### wwatcher setup
+### poly setup
 
-Interactive setup wizard to configure API credentials and webhook URL.
+Interactive settings editor: modify every setting (platforms, categories, threshold,
+interval, odds filters, retention, API keys, webhook) with live values and instant saving.
 
 ```bash
-wwatcher setup
+poly setup
 ```
 
-### wwatcher status
+### poly status
 
 Show current configuration status.
 
 ```bash
-wwatcher status
+poly status
 ```
 
 ## What It Monitors
@@ -184,15 +182,16 @@ wwatcher status
 
 ### Config File Location
 
-- macOS/Linux: `~/.config/wwatcher/config.json`
-- Windows: `%APPDATA%\wwatcher\config.json`
+- Linux: `~/.config/poly/config.json`
+- macOS: `~/Library/Application Support/poly/config.json`
+- Windows: `%APPDATA%\poly\config.json`
 
-### Setup Wizard
+### Settings Editor
 
-Run the interactive setup to configure Kalshi API credentials or webhook URL:
+Run the interactive settings editor to configure every option: platforms, categories, threshold, interval, odds filters, retention, Kalshi API keys, and webhook URL. Changes save immediately.
 
 ```bash
-wwatcher setup
+poly setup
 ```
 
 ### Manual Configuration
@@ -207,7 +206,7 @@ Create or edit the config file directly:
 }
 ```
 
-Note: Kalshi credentials are optional. They provide higher rate limits but are not required for basic monitoring. Currently, there is no functionality to view or place orders.
+Note: Kalshi credentials are optional for monitoring. They enable the real-time WebSocket feed and authenticated trading workflows. poly itself is signal-only; for agent-driven order placement see the `poly-trading` skill in `.claude/skills/`.
 
 ## Webhook Integration
 
@@ -216,11 +215,11 @@ Configure a webhook URL during setup to receive alerts at your custom server, Di
 ### Setup Webhook
 
 ```bash
-wwatcher setup
+poly setup
 # Enter your webhook URL when prompted
 ```
 
-Or manually edit config file at `~/.config/wwatcher/config.json`:
+Or manually edit config file at `~/.config/poly/config.json`:
 
 ```json
 {
@@ -415,7 +414,7 @@ n8n is a self-hosted workflow automation platform. Use the Webhook node to recei
 
 **Step 3**: Configure polymaster with the webhook URL
 ```bash
-wwatcher setup
+poly setup
 # Enter: https://your-n8n-instance.com/webhook/whale-alerts
 ```
 
@@ -549,7 +548,7 @@ node ntfy-bridge.js
 
 2. Configure polymaster to send to the bridge:
 ```bash
-wwatcher setup
+poly setup
 # Enter: http://localhost:3000/webhook/whale-alerts
 ```
 
@@ -624,24 +623,24 @@ Imbalance:  54% bid / 46% ask
 ### Rate limit errors
 Increase polling interval:
 ```bash
-wwatcher watch --interval 60
+poly watch --interval 60
 ```
 
 ### No transactions detected
 Lower the threshold:
 ```bash
-wwatcher watch --threshold 10000
+poly watch --threshold 10000
 ```
 
 ### Service not starting
 Check logs:
 ```bash
-sudo journalctl -u wwatcher.service -n 50
+sudo journalctl -u poly.service -n 50
 ```
 
 ### Update service configuration
 Edit threshold or interval in service file, then reload:
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart wwatcher.service
+sudo systemctl restart poly.service
 ```

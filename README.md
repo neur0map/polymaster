@@ -1,4 +1,4 @@
-# Whale Watcher
+# Poly — Whale Watcher
 
 
 NOTE: repo is transitioning to a full featured trading bot, openclaw like agent that you talk in your telegram with power yo deploy a team of agents to perform research before making a decision.
@@ -50,7 +50,7 @@ This tool is for informational and research purposes only. Use this data solely 
 ### Infrastructure
 - SQLite database for alert history and wallet memory
 - Configurable data retention (7, 30, 90 days, or forever)
-- 6-step guided setup wizard
+- interactive settings editor for every option (platforms, categories, threshold, interval, odds filters, retention, API keys, webhook)
 - No API keys required for basic functionality (all public data)
 - Fast and efficient, built with Rust
 
@@ -60,12 +60,12 @@ This tool is for informational and research purposes only. Use this data solely 
 git clone https://github.com/neur0map/polymaster.git
 cd polymaster
 cargo install --path .
-wwatcher watch
+poly watch
 ```
 
 That's it. No API keys needed — all data comes from public endpoints. You'll see whale alerts in your terminal within seconds.
 
-Run `wwatcher setup` to configure platforms, categories, thresholds, webhooks, and optional API keys.
+Run `poly setup` to configure platforms, categories, thresholds, webhooks, and optional API keys.
 
 See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions and webhook integration.
 
@@ -79,7 +79,7 @@ cd polymaster
 cargo build --release
 ```
 
-The binary will be at `target/release/wwatcher`. Or install it system-wide:
+The binary will be at `target/release/poly`. Or install it system-wide:
 
 ```bash
 cargo install --path .
@@ -87,7 +87,7 @@ cargo install --path .
 
 ## API Information
 
-wwatcher uses **15 API endpoints** across 3 Polymarket APIs, 1 Kalshi REST API, and 1 Kalshi WebSocket. See [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) for complete endpoint documentation.
+poly uses **15 API endpoints** across 3 Polymarket APIs, 1 Kalshi REST API, and 1 Kalshi WebSocket. See [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md) for complete endpoint documentation.
 
 ### Polymarket (3 APIs, no auth required)
 
@@ -104,11 +104,11 @@ wwatcher uses **15 API endpoints** across 3 Polymarket APIs, 1 Kalshi REST API, 
 | REST API | `api.elections.kalshi.com/trade-api/v2` | markets/trades, markets/{ticker}, markets/{ticker}/orderbook |
 | WebSocket | `wss://api.elections.kalshi.com/trade-api/ws/v2` | trade channel (real-time) |
 
-All endpoints are public — no API keys needed. For enhanced Kalshi access, run `wwatcher setup`.
+All endpoints are public — no API keys needed. For enhanced Kalshi access, run `poly setup`.
 
 ### Webhook Integration
 
-wwatcher sends rich JSON payloads to any webhook URL with: market context, whale profile, order book depth, top holders, and wallet activity.
+poly sends rich JSON payloads to any webhook URL with: market context, whale profile, order book depth, top holders, and wallet activity.
 
 See [`docs/WEBHOOK_REFERENCE.md`](docs/WEBHOOK_REFERENCE.md) for:
 - Complete payload schema with all fields
@@ -173,30 +173,33 @@ Imbalance:  54% bid / 46% ask (moderate bid pressure)
 ## Commands
 
 ```bash
-wwatcher watch                        # Start monitoring (default: $25k threshold, 5s interval)
-wwatcher watch -t 50000               # Set threshold to $50,000
-wwatcher watch -t 10000 -i 10         # $10k threshold, 10s polling interval
-wwatcher setup                        # 6-step guided configuration wizard
-wwatcher status                       # View current configuration and DB stats
-wwatcher history                      # View last 20 alerts
-wwatcher history -l 50 -p polymarket  # Last 50 Polymarket alerts
-wwatcher history --json               # Output alert history as JSON
-wwatcher test-sound                   # Test alert sounds
-wwatcher test-webhook                 # Send test webhook payloads
+poly watch                        # Start monitoring (default: $25k threshold, 5s interval)
+poly watch -t 50000               # Set threshold to $50,000
+poly watch -t 10000 -i 10         # $10k threshold, 10s polling interval
+poly setup                        # Interactive settings editor
+poly status                       # View current configuration and DB stats
+poly history                      # View last 20 alerts
+poly history -l 50 -p polymarket  # Last 50 Polymarket alerts
+poly history --json               # Output alert history as JSON
+poly test-sound                   # Test alert sounds
+poly test-webhook                 # Send test webhook payloads
 ```
 
 See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
 
 ## Configuration
 
-Configuration is stored at `~/.config/wwatcher/config.json` (macOS/Linux) or `%APPDATA%\wwatcher\config.json` (Windows).
+Configuration is stored at `~/.config/poly/config.json` (Linux), `~/Library/Application Support/poly/config.json` (macOS), or `%APPDATA%\poly\config.json` (Windows).
 
-Run `wwatcher setup` for a guided 6-step wizard that configures:
+Run `poly setup` for an interactive settings editor that configures (with live values and instant saving):
 1. **Platforms** — Polymarket, Kalshi, or both
 2. **Categories** — Sports, Crypto, Politics, Economics, etc. with subcategory drill-down
-3. **Threshold & Retention** — Minimum trade size and history retention period
-4. **API Keys** — Optional Kalshi credentials
-5. **Save & Summary**
+3. **Alert threshold** — Minimum trade size in USD
+4. **Poll interval** — Seconds between polls
+5. **Max odds / Min spread** — Filter near-settled and dead markets
+6. **History retention** — Days of alert history to keep (0 = forever)
+7. **API Keys** — Optional Kalshi credentials
+8. **Webhook URL** — Your receiver endpoint
 
 ### Documentation
 
@@ -237,7 +240,7 @@ src/
 ├── commands/
 │   ├── mod.rs
 │   ├── watch.rs         # Main watch loop
-│   ├── setup.rs         # 6-step setup wizard
+│   ├── setup.rs         # Interactive settings editor
 │   ├── status.rs        # Status display
 │   └── test.rs          # Sound + webhook tests
 ├── platforms/
@@ -253,7 +256,7 @@ src/
 
 ### No configuration found warning
 
-This is normal. The tool works without configuration using public APIs. Run `wwatcher setup` only if you want to add Kalshi authentication.
+This is normal. The tool works without configuration using public APIs. Run `poly setup` only if you want to add Kalshi authentication.
 
 ### API errors
 
@@ -265,7 +268,7 @@ This is normal. The tool works without configuration using public APIs. Run `wwa
 If you're getting rate limited:
 
 - Increase the `--interval` to poll less frequently
-- For Kalshi: Add API credentials via `wwatcher setup`
+- For Kalshi: Add API credentials via `poly setup`
 
 ## Contributors
 
@@ -275,7 +278,7 @@ Thanks to these contributors for their ideas and improvements:
 
 ## Integration (MCP)
 
-wwatcher includes a scoring MCP server with two tools: `score_alert` and `check_preferences`. No API keys required.
+poly includes a scoring MCP server with two tools: `score_alert` and `check_preferences`. No API keys required.
 
 See [`integration/README.md`](./integration/README.md) for setup and tool details.
 
@@ -302,7 +305,7 @@ You (CEO) ←→ Telegram ←→ Manager Bot
 
 - **Manager** — conversational AI with personality (soul.md), persistent memory, and skills. Delegates to team.
 - **Researcher** — gathers market data, news, sentiment (ONNX)
-- **Analyst** — reads wwatcher whale history, scores alerts, detects patterns
+- **Analyst** — reads poly whale history, scores alerts, detects patterns
 - **Risk** — evaluates position sizing, bankroll management
 - **Executor** — places trades after your approval
 
@@ -314,7 +317,7 @@ Each agent has its own soul (personality), skills (instructions), and memory (SQ
 |-------|-------------|--------|
 | **Phase 1** | Talking bot — Telegram, personality, memory, data collection | Planned |
 | **Phase 2** | Team spawning — multi-agent delegation, whale analysis | Planned |
-| **Phase 3** | Alert pipeline — wwatcher webhook triggers auto-analysis | Planned |
+| **Phase 3** | Alert pipeline — poly webhook triggers auto-analysis | Planned |
 | **Phase 4** | Execution — Kalshi + Polymarket order placement | Planned |
 | **Phase 5** | ML models — ONNX sentiment, reranker, time series | Planned |
 | **Phase 6** | Continual learning — Self-SFT + GRPO on resolved market outcomes | Planned |
@@ -322,6 +325,18 @@ Each agent has its own soul (personality), skills (instructions), and memory (SQ
 ### Continual Learning
 
 The bot collects predictions from day one. When markets resolve, it builds training data automatically. Fine-tune a local 7B model (MLX on Mac, free) that gets better at your specific markets over time. Based on [Turtel et al. 2025](https://arxiv.org/abs/2505.17989) — same approach that matched o1 accuracy on Polymarket with a 14B model.
+
+## Agent Skills
+
+Operator skills for AI agents live in [`.claude/skills/`](.claude/skills). Each `SKILL.md` gives an agent everything needed to install, configure, and operate poly without reading the source:
+
+| Skill | Use it for |
+|-------|------------|
+| `poly-setup` | Installing, configuring, and tuning poly for a user's needs |
+| `poly-webhook` | Delivering alerts to n8n, Discord, Slack, or custom receivers |
+| `poly-daemon` | Running `poly watch` as a systemd service, viewing logs, updating |
+| `poly-database` | Querying, exporting, and backing up stored alert history |
+| `poly-trading` | Reading Kalshi order books and placing orders via the authenticated API (demo first, user approval required) |
 
 ## License
 

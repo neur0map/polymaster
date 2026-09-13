@@ -1,16 +1,16 @@
-# wwatcher Integration Instructions
+# poly Integration Instructions
 
 ## How It Works
 
 ```
 ┌─────────────┐     ┌─────────┐     ┌──────────┐     ┌──────────┐     ┌────────────┐
-│  wwatcher   │────▶│   n8n   │────▶│ Telegram │────▶│  Agent   │────▶│  Scored    │
+│  poly   │────▶│   n8n   │────▶│ Telegram │────▶│  Agent   │────▶│  Scored    │
 │  (Rust CLI) │     │ webhook │     │ message  │     │ score +  │     │  Analysis  │
 └─────────────┘     └─────────┘     └──────────┘     │ analyze  │     └────────────┘
                                                       └──────────┘
 ```
 
-1. **wwatcher** monitors Polymarket/Kalshi for whale transactions
+1. **poly** monitors Polymarket/Kalshi for whale transactions
 2. **Webhook** fires with enriched payload (whale profile, order book, market context, top holders)
 3. **n8n** receives webhook, sends alert to your messaging platform
 4. **Agent** scores the alert, checks user preferences, analyzes the data
@@ -20,7 +20,7 @@
 
 ## Setup Guide
 
-### Step 1: Install & Build wwatcher
+### Step 1: Install & Build poly
 
 ```bash
 git clone https://github.com/neur0map/polymaster.git
@@ -28,16 +28,16 @@ cd polymaster
 cargo install --path .
 ```
 
-### Step 2: Run Setup Wizard
+### Step 2: Run the Settings Editor
 
 ```bash
-wwatcher setup
+poly setup
 ```
 
-The wizard configures:
+The editor configures:
 - **Platforms** — Polymarket, Kalshi, or both
 - **Categories** — Sports, Crypto, Politics, Economics, etc.
-- **Threshold & Retention** — Minimum trade size and history retention
+- **Sensitivity** — Threshold, interval, odds and spread filters, history retention
 - **API Keys** — Optional Kalshi credentials
 - **Webhook URL** — Your n8n endpoint
 
@@ -60,10 +60,10 @@ Create an n8n workflow:
 **Action Node: Telegram/Discord/Slack**
 - Send the full alert JSON to your agent's chat
 
-### Step 5: Start wwatcher
+### Step 5: Start poly
 
 ```bash
-wwatcher watch --threshold 35000 --interval 5
+poly watch --threshold 35000 --interval 5
 ```
 
 ---
@@ -162,5 +162,5 @@ Every alert is scored based on whale profile, trade size, order book, and positi
 
 | Item | Path |
 |------|------|
-| wwatcher config | `~/.config/wwatcher/config.json` |
-| Alert database | `~/.config/wwatcher/wwatcher.db` |
+| poly config | `~/.config/poly/config.json` |
+| Alert database | `~/.config/poly/poly.db` |
