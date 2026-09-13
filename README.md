@@ -1,8 +1,6 @@
 # Poly — Whale Watcher
 
 
-NOTE: repo is transitioning to a full featured trading bot, openclaw like agent that you talk in your telegram with power yo deploy a team of agents to perform research before making a decision.
-
 A Rust CLI tool that monitors large transactions on Polymarket and Kalshi prediction markets. Real-time alerts for significant market activity with built-in anomaly detection.
 
 Repository: https://github.com/neur0map/polymaster
@@ -276,59 +274,13 @@ Thanks to these contributors for their ideas and improvements:
 
 - [@fuzmik](https://github.com/fuzmik) - Suggested alert history logging feature
 
-## Integration (MCP)
+## Attaching Agentic Agents
 
-poly includes a scoring MCP server with two tools: `score_alert` and `check_preferences`. No API keys required.
+poly is intentionally signal-only: it watches markets, fires alerts, and stores history. Agentic agents (OpenClaw, Hermes, GrokBot, n8n, or any MCP client) attach on top via three surfaces:
 
-See [`integration/README.md`](./integration/README.md) for setup and tool details.
-
-## Prowl Bot (Planned)
-
-A conversational Telegram bot with a multi-agent prediction market team. The bot talks to you, analyzes whale alerts, and can place trades on Kalshi and Polymarket after your approval.
-
-See [`docs/plans/2026-02-25-prowl-bot-design.md`](./docs/plans/2026-02-25-prowl-bot-design.md) for the full design document.
-
-### Architecture
-
-```
-You (CEO) ←→ Telegram ←→ Manager Bot
-                              │
-                    ┌─────────┼─────────┐
-                    ▼         ▼         ▼
-                Researcher  Analyst    Risk
-                    └─────────┼─────────┘
-                              ▼
-                      Decision + Approval
-                              ▼
-                    Executor (Kalshi + Polymarket)
-```
-
-- **Manager** — conversational AI with personality (soul.md), persistent memory, and skills. Delegates to team.
-- **Researcher** — gathers market data, news, sentiment (ONNX)
-- **Analyst** — reads poly whale history, scores alerts, detects patterns
-- **Risk** — evaluates position sizing, bankroll management
-- **Executor** — places trades after your approval
-
-Each agent has its own soul (personality), skills (instructions), and memory (SQLite partition). Cloud LLMs for reasoning (OpenRouter), local models for cheap tasks (Ollama), ONNX for ML (sentiment, reranking, time series).
-
-### Roadmap
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| **Phase 1** | Talking bot — Telegram, personality, memory, data collection | Planned |
-| **Phase 2** | Team spawning — multi-agent delegation, whale analysis | Planned |
-| **Phase 3** | Alert pipeline — poly webhook triggers auto-analysis | Planned |
-| **Phase 4** | Execution — Kalshi + Polymarket order placement | Planned |
-| **Phase 5** | ML models — ONNX sentiment, reranker, time series | Planned |
-| **Phase 6** | Continual learning — Self-SFT + GRPO on resolved market outcomes | Planned |
-
-### Continual Learning
-
-The bot collects predictions from day one. When markets resolve, it builds training data automatically. Fine-tune a local 7B model (MLX on Mac, free) that gets better at your specific markets over time. Based on [Turtel et al. 2025](https://arxiv.org/abs/2505.17989) — same approach that matched o1 accuracy on Polymarket with a 14B model.
-
-## Agent Skills
-
-Operator skills for AI agents live in [`.claude/skills/`](.claude/skills). Each `SKILL.md` gives an agent everything needed to install, configure, and operate poly without reading the source:
+- **Webhook** — every alert POSTs enriched JSON (market context, order book, whale profile, market link) to your endpoint; see [`docs/WEBHOOK_REFERENCE.md`](docs/WEBHOOK_REFERENCE.md)
+- **Scoring MCP** — [`integration/`](./integration/README.md) ships a scoring MCP server with `score_alert` and `check_preferences` tools. No API keys required.
+- **Operator skills** — [`.claude/skills/`](.claude/skills) gives an agent everything needed to install, configure, daemonize, query, and trade with poly without reading the source:
 
 | Skill | Use it for |
 |-------|------------|
