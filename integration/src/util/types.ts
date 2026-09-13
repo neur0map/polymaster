@@ -1,4 +1,4 @@
-/** Matches the JSON schema from wwatcher's build_alert_payload() in src/alerts/mod.rs */
+/** Matches the JSON schema from poly's build_alert_payload() in src/alerts/mod.rs */
 export interface WhalertAlert {
   platform: string;
   alert_type: "WHALE_ENTRY" | "WHALE_EXIT";

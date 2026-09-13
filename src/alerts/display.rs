@@ -49,6 +49,9 @@ pub fn print_market_context(ctx: &MarketContext) {
     if !ctx.tags.is_empty() {
         println!("Tags:          {}", ctx.tags.join(", ").dimmed());
     }
+    if let Some(url) = &ctx.url {
+        println!("Link:          {}", url.bright_blue().underline());
+    }
 }
 
 pub fn print_whale_alert(

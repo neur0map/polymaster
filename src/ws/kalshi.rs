@@ -1,15 +1,32 @@
 use std::time::Duration;
 
+use base64::Engine as _;
 use futures_util::{SinkExt, StreamExt};
+use rand::rngs::OsRng;
+use rsa::pkcs1::DecodeRsaPrivateKey;
+use rsa::pkcs8::DecodePrivateKey;
+use rsa::pss::SigningKey;
+use rsa::sha2::Sha256;
+use rsa::signature::{RandomizedSigner, SignatureEncoding};
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
 use tokio_tungstenite::tungstenite::Message;
 
 const KALSHI_WS_URL: &str = "wss://api.elections.kalshi.com/trade-api/ws/v2";
+const KALSHI_WS_PATH: &str = "/trade-api/ws/v2";
 const PING_INTERVAL: Duration = Duration::from_secs(10);
 const RECONNECT_BASE: Duration = Duration::from_secs(2);
 const RECONNECT_MAX: Duration = Duration::from_secs(60);
+
+/// Kalshi API credentials for the authenticated WebSocket handshake.
+#[derive(Debug, Clone)]
+pub struct KalshiAuth {
+    pub key_id: String,
+    pub private_key: String,
+}
 
 /// A trade received from the Kalshi WebSocket
 #[derive(Debug, Clone)]
@@ -60,16 +77,33 @@ fn subscribe_cmd() -> String {
     .to_string()
 }
 
+/// Sign the WebSocket handshake request the way Kalshi requires:
+/// RSA-PSS (SHA256, digest-length salt) over `timestamp + "GET" + path`, base64-encoded.
+fn sign_handshake(auth: &KalshiAuth, timestamp_ms: u128) -> Result<String, String> {
+    let pem = auth.private_key.trim();
+    let key = rsa::RsaPrivateKey::from_pkcs8_pem(pem)
+        .or_else(|_| rsa::RsaPrivateKey::from_pkcs1_pem(pem))
+        .map_err(|e| format!("could not parse Kalshi private key: {}", e))?;
+
+    let msg = format!("{}GET{}", timestamp_ms, KALSHI_WS_PATH);
+    let signing_key = SigningKey::<Sha256>::new(key);
+    let signature = signing_key.sign_with_rng(&mut OsRng, msg.as_bytes());
+    Ok(base64::engine::general_purpose::STANDARD.encode(
+        signature.to_bytes(),
+    ))
+}
+
 /// Spawn a Kalshi WebSocket listener that sends trades to the returned channel.
 /// The connection auto-reconnects with exponential backoff on failure.
-pub fn spawn_kalshi_ws() -> mpsc::UnboundedReceiver<WsTrade> {
+/// Kalshi requires authentication on the WS handshake, so `auth` is required.
+pub fn spawn_kalshi_ws(auth: KalshiAuth) -> mpsc::UnboundedReceiver<WsTrade> {
     let (tx, rx) = mpsc::unbounded_channel();
 
     tokio::spawn(async move {
         let mut backoff = RECONNECT_BASE;
 
         loop {
-            match connect_and_listen(&tx).await {
+            match connect_and_listen(&auth, &tx).await {
                 Ok(()) => {
                     // Clean disconnect — reconnect immediately
                     eprintln!("[WS] Kalshi WebSocket disconnected, reconnecting...");
@@ -88,9 +122,43 @@ pub fn spawn_kalshi_ws() -> mpsc::UnboundedReceiver<WsTrade> {
 }
 
 async fn connect_and_listen(
+    auth: &KalshiAuth,
     tx: &mpsc::UnboundedSender<WsTrade>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let (ws_stream, _) = connect_async(KALSHI_WS_URL).await?;
+    let mut request = KALSHI_WS_URL.into_client_request()?;
+    let timestamp_ms = chrono::Utc::now().timestamp_millis() as u128;
+    let signature = sign_handshake(auth, timestamp_ms)
+        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { e.into() })?;
+    {
+        let headers = request.headers_mut();
+        headers.insert(
+            "KALSHI-ACCESS-KEY",
+            HeaderValue::from_str(&auth.key_id)?,
+        );
+        headers.insert(
+            "KALSHI-ACCESS-SIGNATURE",
+            HeaderValue::from_str(&signature)?,
+        );
+        headers.insert(
+            "KALSHI-ACCESS-TIMESTAMP",
+            HeaderValue::from_str(&timestamp_ms.to_string())?,
+        );
+    }
+
+    let (ws_stream, _) = connect_async(request).await.map_err(|e| {
+        let hint = format!("{}", e);
+        if hint.contains("401") {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "Kalshi rejected the credentials (401). Check your API key ID and private key via 'poly setup'.",
+            )) as Box<dyn std::error::Error + Send + Sync>
+        } else {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("{}", e),
+            )) as Box<dyn std::error::Error + Send + Sync>
+        }
+    })?;
     let (mut write, mut read) = ws_stream.split();
 
     // Subscribe to trade channel

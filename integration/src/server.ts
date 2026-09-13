@@ -5,7 +5,7 @@ import type { WhalertAlert, AlertPreferences } from "./util/types.js";
 
 export function createServer(): McpServer {
   const server = new McpServer({
-    name: "wwatcher",
+    name: "poly",
     version: "2.0.0",
   });
 

@@ -135,6 +135,13 @@ pub async fn fetch_market_context(condition_id: &str) -> Option<crate::alerts::M
         })
         .unwrap_or_default();
 
+    // Direct market page URL for clickable alerts (from the market slug)
+    let url = market
+        .get("slug")
+        .and_then(|s| s.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("https://polymarket.com/market/{}", s));
+
     Some(crate::alerts::MarketContext {
         yes_price,
         no_price,
@@ -144,6 +151,7 @@ pub async fn fetch_market_context(condition_id: &str) -> Option<crate::alerts::M
         price_change_24h,
         liquidity,
         tags,
+        url,
     })
 }
 

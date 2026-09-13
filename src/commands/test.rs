@@ -35,7 +35,7 @@ pub async fn test_webhook() -> Result<(), Box<dyn std::error::Error>> {
         Err(_) => {
             println!(
                 "{}",
-                "No configuration found. Run 'wwatcher setup' first.".red()
+                "No configuration found. Run 'poly setup' first.".red()
             );
             return Ok(());
         }
@@ -46,7 +46,7 @@ pub async fn test_webhook() -> Result<(), Box<dyn std::error::Error>> {
         None => {
             println!(
                 "{}",
-                "No webhook configured. Run 'wwatcher setup' to add a webhook URL.".red()
+                "No webhook configured. Run 'poly setup' to add a webhook URL.".red()
             );
             return Ok(());
         }

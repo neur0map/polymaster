@@ -4,7 +4,7 @@ use rusqlite::Connection;
 use crate::db;
 
 pub async fn show_status(conn: &Connection) -> Result<(), Box<dyn std::error::Error>> {
-    println!("{}", "WHALE WATCHER STATUS".bright_cyan().bold());
+    println!("{}", "POLY STATUS".bright_cyan().bold());
     println!();
 
     match crate::config::load_config() {
@@ -37,6 +37,9 @@ pub async fn show_status(conn: &Connection) -> Result<(), Box<dyn std::error::Er
             };
             println!("  Categories:    {}", cat_display.green());
             println!("  Threshold:     {}", format!("${}", cfg.threshold).green());
+            println!("  Interval:      {}", format!("{} seconds", cfg.interval_secs).green());
+            println!("  Max odds:      {}", format!("{:.2}", cfg.max_odds).green());
+            println!("  Min spread:    {}", format!("{:.2}", cfg.min_spread).green());
             println!(
                 "  Retention:     {}",
                 if cfg.history_retention_days == 0 {
@@ -48,7 +51,7 @@ pub async fn show_status(conn: &Connection) -> Result<(), Box<dyn std::error::Er
             );
         }
         Err(_) => {
-            println!("No configuration found. Run 'wwatcher setup' to configure.");
+            println!("No configuration found. Run 'poly setup' to configure.");
         }
     }
 

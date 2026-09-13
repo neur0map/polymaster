@@ -18,6 +18,8 @@ pub struct MarketContext {
     pub price_change_24h: f64,
     pub liquidity: f64,
     pub tags: Vec<String>,
+    /// Direct link to the market page (Polymarket; Kalshi exposes none)
+    pub url: Option<String>,
 }
 
 /// Order book depth summary
@@ -128,6 +130,9 @@ pub fn build_alert_payload(alert: &AlertData, escape_text: bool) -> serde_json::
             "liquidity": ctx.liquidity,
             "tags": ctx.tags,
         });
+        if let Some(u) = &ctx.url {
+            payload["market_context"]["url"] = json!(u);
+        }
     }
 
     if let Some(wp) = alert.whale_profile {

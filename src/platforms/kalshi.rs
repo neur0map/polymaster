@@ -29,7 +29,75 @@ pub struct Trade {
 #[derive(Debug, Deserialize)]
 struct TradesResponse {
     #[serde(default)]
-    trades: Vec<Trade>,
+    trades: Vec<TradeWire>,
+}
+
+/// Wire format for a Kalshi trade. Kalshi migrated from integer-cent fields
+/// (`price`, `count`, `yes_price`, `no_price`) to fixed-point dollar strings
+/// (`price_dollars`, `count_fp`); both shapes are accepted.
+#[derive(Debug, Deserialize)]
+struct TradeWire {
+    trade_id: String,
+    ticker: String,
+    #[serde(default)]
+    count: Option<i64>,
+    #[serde(default)]
+    count_fp: Option<String>,
+    #[serde(default)]
+    price: Option<f64>,
+    #[serde(default)]
+    yes_price: Option<f64>,
+    #[serde(default)]
+    no_price: Option<f64>,
+    #[serde(default)]
+    yes_price_dollars: Option<String>,
+    #[serde(default)]
+    no_price_dollars: Option<String>,
+    #[serde(default)]
+    taker_side: Option<String>,
+    #[serde(default)]
+    created_time: Option<String>,
+}
+
+impl TradeWire {
+    fn into_trade(self) -> Trade {
+        let dollars_to_cents = |s: &Option<String>| {
+            s.as_deref()
+                .and_then(|v| v.parse::<f64>().ok())
+                .map(|d| (d * 100.0).round())
+        };
+        let count = self
+            .count
+            .map(|c| c as i32)
+            .or_else(|| {
+                self.count_fp
+                    .as_deref()
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .map(|f| f.round() as i32)
+            })
+            .unwrap_or(1);
+        let yes_price = self
+            .yes_price
+            .or_else(|| dollars_to_cents(&self.yes_price_dollars))
+            .unwrap_or(0.0);
+        let no_price = self
+            .no_price
+            .or_else(|| dollars_to_cents(&self.no_price_dollars))
+            .unwrap_or(0.0);
+        Trade {
+            trade_id: self.trade_id,
+            ticker: self.ticker,
+            price: self.price.unwrap_or(yes_price),
+            count,
+            yes_price,
+            no_price,
+            taker_side: self.taker_side.unwrap_or_else(|| "yes".to_string()),
+            created_time: self
+                .created_time
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+            market_title: None,
+        }
+    }
 }
 
 pub async fn fetch_recent_trades(config: Option<&Config>) -> Result<Vec<Trade>, KalshiError> {
@@ -66,7 +134,7 @@ pub async fn fetch_recent_trades(config: Option<&Config>) -> Result<Vec<Trade>, 
     let text = response.text().await?;
 
     match serde_json::from_str::<TradesResponse>(&text) {
-        Ok(response) => Ok(response.trades),
+        Ok(response) => Ok(response.trades.into_iter().map(|t| t.into_trade()).collect()),
         Err(e) => {
             // If parsing fails, return empty list to allow tool to continue
             eprintln!("Warning: Failed to parse Kalshi response: {}", e);
@@ -112,41 +180,45 @@ pub async fn fetch_market_context(ticker: &str) -> Option<crate::alerts::MarketC
     let parsed: serde_json::Value = serde_json::from_str(&text).ok()?;
     let market = parsed.get("market")?;
 
-    let yes_bid = market.get("yes_bid")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0) / 100.0;
-    let yes_ask = market.get("yes_ask")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0) / 100.0;
-    let no_bid = market.get("no_bid")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0) / 100.0;
+    // Kalshi migrated market objects to fixed-point dollar strings (e.g. "0.5620")
+    // and contract counts as fixed-point strings ("123.45"). Fall back to the
+    // legacy integer-cent fields for robustness.
+    let f64_field = |v: Option<&serde_json::Value>| -> Option<f64> {
+        match v {
+            Some(serde_json::Value::String(s)) => s.parse::<f64>().ok(),
+            Some(n) => n.as_f64(),
+            None => None,
+        }
+    };
+    let dollars = |dollars_key: &str, legacy_cents_key: &str| -> f64 {
+        f64_field(market.get(dollars_key))
+            .or_else(|| f64_field(market.get(legacy_cents_key)).map(|v| v / 100.0))
+            .unwrap_or(0.0)
+    };
+
+    let yes_bid = dollars("yes_bid_dollars", "yes_bid");
+    let yes_ask = dollars("yes_ask_dollars", "yes_ask");
+    let no_bid = dollars("no_bid_dollars", "no_bid");
 
     let spread = (yes_ask - yes_bid).abs();
 
-    let volume_24h = market.get("volume_24h")
-        .and_then(|v| v.as_f64())
+    let volume_24h = f64_field(market.get("volume_24h_fp"))
+        .or_else(|| f64_field(market.get("volume_24h")))
         .unwrap_or(0.0);
 
-    let open_interest = market.get("open_interest")
-        .and_then(|v| v.as_f64())
+    let open_interest = f64_field(market.get("open_interest_fp"))
+        .or_else(|| f64_field(market.get("open_interest")))
         .unwrap_or(0.0);
 
-    let last_price = market.get("last_price")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0) / 100.0;
-    let prev_price = market.get("previous_price")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0) / 100.0;
+    let last_price = dollars("last_price_dollars", "last_price");
+    let prev_price = dollars("previous_price_dollars", "previous_price");
     let price_change_24h = if prev_price > 0.0 {
         ((last_price - prev_price) / prev_price) * 100.0
     } else {
         0.0
     };
 
-    let liquidity = market.get("liquidity")
-        .and_then(|v| v.as_f64())
-        .unwrap_or(0.0);
+    let liquidity = dollars("liquidity_dollars", "liquidity");
 
     // Extract category and tags from Kalshi market data
     let tags: Vec<String> = market.get("category")
@@ -163,6 +235,7 @@ pub async fn fetch_market_context(ticker: &str) -> Option<crate::alerts::MarketC
         price_change_24h,
         liquidity,
         tags,
+        url: None,
     })
 }
 
@@ -191,10 +264,34 @@ pub async fn fetch_order_book(ticker: &str) -> Option<crate::alerts::OrderBookSu
 
     let text = response.text().await.ok()?;
     let parsed: serde_json::Value = serde_json::from_str(&text).ok()?;
-    let orderbook = parsed.get("orderbook").unwrap_or(&parsed);
+    // Kalshi's orderbook moved to `orderbook_fp` with string pairs
+    // ["<price in dollars>", "<quantity in contracts>"]; fall back to the
+    // legacy `orderbook` cent-integer format.
+    let orderbook = parsed
+        .get("orderbook_fp")
+        .or_else(|| parsed.get("orderbook"))
+        .unwrap_or(&parsed);
 
-    let yes_bids = orderbook.get("yes").and_then(|v| v.as_array());
-    let no_bids = orderbook.get("no").and_then(|v| v.as_array());
+    let parse_level = |entry: &serde_json::Value| -> (f64, f64) {
+        if let Some(arr) = entry.as_array() {
+            let price = match arr.first() {
+                Some(serde_json::Value::String(s)) => s.parse::<f64>().unwrap_or(0.0),
+                Some(v) => v.as_f64().unwrap_or(0.0) / 100.0,
+                None => 0.0,
+            };
+            let qty = match arr.get(1) {
+                Some(serde_json::Value::String(s)) => s.parse::<f64>().unwrap_or(0.0),
+                Some(v) => v.as_f64().unwrap_or(0.0),
+                None => 0.0,
+            };
+            (price, qty)
+        } else {
+            (0.0, 0.0)
+        }
+    };
+
+    let yes_bids = orderbook.get("yes_dollars").or_else(|| orderbook.get("yes")).and_then(|v| v.as_array());
+    let no_bids = orderbook.get("no_dollars").or_else(|| orderbook.get("no")).and_then(|v| v.as_array());
 
     // Kalshi orderbook format: arrays of [price, quantity] for yes and no sides
     let (best_bid, bid_depth, bid_levels) = if let Some(bids) = yes_bids {
@@ -202,14 +299,10 @@ pub async fn fetch_order_book(ticker: &str) -> Option<crate::alerts::OrderBookSu
         let mut depth = 0.0f64;
         let mut levels = 0u32;
         for entry in bids {
-            let arr = entry.as_array();
-            if let Some(arr) = arr {
-                let price = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) / 100.0;
-                let qty = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                if price > best { best = price; }
-                depth += price * qty;
-                levels += 1;
-            }
+            let (price, qty) = parse_level(entry);
+            if price > best { best = price; }
+            depth += price * qty;
+            levels += 1;
         }
         (best, depth, levels)
     } else {
@@ -221,14 +314,10 @@ pub async fn fetch_order_book(ticker: &str) -> Option<crate::alerts::OrderBookSu
         let mut depth = 0.0f64;
         let mut levels = 0u32;
         for entry in asks {
-            let arr = entry.as_array();
-            if let Some(arr) = arr {
-                let price = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) / 100.0;
-                let qty = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                if price < best { best = price; }
-                depth += price * qty;
-                levels += 1;
-            }
+            let (price, qty) = parse_level(entry);
+            if price < best { best = price; }
+            depth += price * qty;
+            levels += 1;
         }
         // best_ask for YES side is 1 - best NO bid
         (1.0 - best, depth, levels)

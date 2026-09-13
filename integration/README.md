@@ -1,6 +1,6 @@
-# wwatcher Integration
+# poly Integration
 
-Scoring MCP server for wwatcher whale alerts. Two tools:
+Scoring MCP server for poly whale alerts. Two tools:
 - **score_alert** — score an alert and get tier + factors
 - **check_preferences** — filter alerts against user preferences
 
@@ -23,7 +23,7 @@ Add to your MCP client config:
 ```json
 {
   "mcpServers": {
-    "wwatcher": {
+    "poly": {
       "command": "node",
       "args": ["/absolute/path/to/integration/dist/index.js"]
     }

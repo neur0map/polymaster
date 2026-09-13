@@ -9,10 +9,8 @@ pub fn wallet_hash(wallet_id: &str) -> String {
 }
 
 pub fn db_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let config_dir = dirs::config_dir().ok_or("Could not determine config directory")?;
-    let wwatcher_dir = config_dir.join("wwatcher");
-    std::fs::create_dir_all(&wwatcher_dir)?;
-    Ok(wwatcher_dir.join("wwatcher.db"))
+    let app_dir = crate::config::app_dir()?;
+    Ok(app_dir.join("poly.db"))
 }
 
 pub fn open_db() -> Result<Connection, Box<dyn std::error::Error>> {
@@ -221,8 +219,11 @@ pub fn query_alerts(
     Ok(alerts)
 }
 
-/// Prune old alerts based on retention days
+/// Prune old alerts based on retention days (0 = keep forever)
 pub fn prune_old_alerts(conn: &Connection, retention_days: u32) {
+    if retention_days == 0 {
+        return;
+    }
     let seconds = retention_days as i64 * 86400;
     let result = conn.execute(
         "DELETE FROM alerts WHERE created_at < (strftime('%s', 'now') - ?1)",
@@ -246,12 +247,10 @@ pub fn prune_wallet_memory(conn: &Connection) {
 
 /// Migrate existing JSONL history to SQLite
 pub fn migrate_jsonl_if_exists(conn: &Connection) {
-    let config_dir = match dirs::config_dir() {
-        Some(d) => d,
-        None => return,
+    let jsonl_path = match crate::config::app_dir() {
+        Ok(d) => d.join("alert_history.jsonl"),
+        Err(_) => return,
     };
-
-    let jsonl_path = config_dir.join("wwatcher").join("alert_history.jsonl");
     if !jsonl_path.exists() {
         return;
     }
@@ -298,7 +297,10 @@ pub fn migrate_jsonl_if_exists(conn: &Connection) {
     }
 
     if count > 0 {
-        let bak_path = config_dir.join("wwatcher").join("alert_history.jsonl.bak");
+        let bak_path = match crate::config::app_dir() {
+            Ok(d) => d.join("alert_history.jsonl.bak"),
+            Err(_) => return,
+        };
         if std::fs::rename(&jsonl_path, &bak_path).is_ok() {
             eprintln!("Migrated {} alerts from JSONL to SQLite database.", count);
             eprintln!("Old file backed up to: alert_history.jsonl.bak");

@@ -1,11 +1,11 @@
 [package]
-name = "wwatcher"
-version = "0.2.0"
+name = "polymaster"
+version = "0.3.0"
 edition = "2021"
 authors = ["Neur0map"]
 
 [[bin]]
-name = "wwatcher"
+name = "poly"
 path = "src/main.rs"
 
 [dependencies]
@@ -22,3 +22,6 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
 futures-util = "0.3"
+rsa = { version = "0.9", features = ["sha2", "pem"] }
+rand = "0.8"
+base64 = "0.22"

@@ -26,7 +26,7 @@ pub async fn watch_whales(threshold: u64, interval: u64, conn: Connection) -> Re
     println!("{}", "=".repeat(70).bright_yellow());
     println!();
 
-    println!("{}", "WHALE WATCHER ACTIVE".bright_cyan().bold());
+    println!("{}", "POLY - WHALE WATCH ACTIVE".bright_cyan().bold());
     println!(
         "Threshold: {}",
         format!("${}", format_number(threshold)).bright_green()
@@ -84,10 +84,29 @@ pub async fn watch_whales(threshold: u64, interval: u64, conn: Connection) -> Re
     let mut wallet_tracker = types::WalletTracker::new();
     let mut whale_cache = whale_profile::WhaleProfileCache::new();
 
-    // Start Kalshi WebSocket if watching Kalshi
+    // Start Kalshi WebSocket if watching Kalshi (Kalshi requires auth on the WS handshake)
     let mut kalshi_ws_rx = if watch_kalshi {
-        println!("Kalshi WS:  {}", "Connecting...".bright_cyan());
-        Some(crate::ws::kalshi::spawn_kalshi_ws())
+        let kalshi_auth = config.as_ref().and_then(|c| {
+            Some(crate::ws::kalshi::KalshiAuth {
+                key_id: c.kalshi_api_key_id.clone()?,
+                private_key: c.kalshi_private_key.clone()?,
+            })
+        });
+        match kalshi_auth {
+            Some(auth) => {
+                println!("Kalshi WS:  {}", "Connecting (authenticated)...".bright_cyan());
+                Some(crate::ws::kalshi::spawn_kalshi_ws(auth))
+            }
+            None => {
+                println!(
+                    "Kalshi WS:  {} — {} {}",
+                    "skipped".yellow(),
+                    "no API keys configured; using HTTP polling instead.".yellow(),
+                    "Add keys via 'poly setup' for real-time trades.".dimmed()
+                );
+                None
+            }
+        }
     } else {
         None
     };

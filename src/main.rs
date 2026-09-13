@@ -11,8 +11,8 @@ mod ws;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "wwatcher")]
-#[command(about = "Whale Watcher - Monitor large transactions on Polymarket and Kalshi", long_about = None)]
+#[command(name = "poly")]
+#[command(about = "poly - Monitor whale activity on Polymarket and Kalshi", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -22,13 +22,13 @@ struct Cli {
 enum Commands {
     /// Watch for large transactions (default threshold: $25,000)
     Watch {
-        /// Minimum transaction size to alert on (in USD)
-        #[arg(short, long, default_value = "25000")]
-        threshold: u64,
+        /// Minimum transaction size to alert on (in USD, overrides config)
+        #[arg(short, long)]
+        threshold: Option<u64>,
 
-        /// Polling interval in seconds
-        #[arg(short, long, default_value = "5")]
-        interval: u64,
+        /// Polling interval in seconds (overrides config)
+        #[arg(short, long)]
+        interval: Option<u64>,
     },
     /// View alert history
     History {
@@ -75,6 +75,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             threshold,
             interval,
         } => {
+            let config = config::load_config().unwrap_or_default();
+            let threshold = threshold.unwrap_or(config.threshold);
+            let interval = interval.unwrap_or(config.interval_secs).max(1);
             commands::watch::watch_whales(threshold, interval, conn).await?;
         }
         Commands::History {

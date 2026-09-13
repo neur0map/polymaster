@@ -61,7 +61,7 @@ pub fn show_alert_history(
         println!("No alerts found matching filters.");
         println!(
             "Run {} to start monitoring and logging alerts.",
-            "wwatcher watch".bright_cyan()
+            "poly watch".bright_cyan()
         );
         return Ok(());
     }
@@ -130,11 +130,11 @@ pub fn show_alert_history(
         );
         println!(
             "View as JSON: {} --json",
-            "wwatcher history".bright_cyan()
+            "poly history".bright_cyan()
         );
         println!(
             "Filter by platform: {} --platform polymarket",
-            "wwatcher history".bright_cyan()
+            "poly history".bright_cyan()
         );
     }
 
